@@ -3,40 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v15.9 (UI Elements Restored)</title>
+    <title>GPS Tracker Pro v16.0 (Stable & Interactive)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f3f4f6; }
-        .view-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; background: #f3f4f6; z-index: 10; }
+        
+        /* Modal & Views - Higher z-index to stay above character icons */
+        .view-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; background: #f3f4f6; z-index: 50; }
         .view-screen.active { display: flex; }
+        
+        /* Stats Styling */
         .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; }
         #map { flex-grow: 1; width: 100%; position: relative; }
-        .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 10px 20px; border-radius: 999px; z-index: 9999; display: none; font-size: 14px; white-space: nowrap; }
         
-        /* AI Character & Bubble Styling */
-        #ai-container { position: fixed; bottom: 100px; left: 20px; right: 80px; display: flex; align-items: flex-end; gap: 10px; z-index: 40; pointer-events: none; transition: all 0.5s ease; }
-        #ai-avatar { width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; overflow: hidden; shrink-0; pointer-events: auto; }
+        /* AI Character Container - Lower z-index so it doesn't block Modals */
+        #ai-container { position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 300px; display: flex; align-items: flex-end; gap: 10px; z-index: 40; pointer-events: none; transition: all 0.5s ease; }
+        #ai-avatar { width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; overflow: hidden; shrink-0; pointer-events: auto; cursor: pointer; }
         #ai-avatar img { width: 100%; height: 100%; object-fit: cover; }
         
-        #ai-chat-bubble { background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; pointer-events: auto; border-left: 4px solid #ec4899; max-width: 240px; }
+        #ai-chat-bubble { background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; pointer-events: auto; border-left: 4px solid #ec4899; }
         
         .ai-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
         
-        #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; z-index: 25; backdrop-filter: blur(8px); margin-bottom: 4px; }
+        /* HUD and Navigation */
+        #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 20; }
         .mode-btn.active { background-color: #ec4899; color: white; border-color: #ec4899; }
         .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
+        
+        .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 10px 20px; border-radius: 999px; z-index: 9999; display: none; font-size: 14px; white-space: nowrap; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
 
-    <!-- --- MAIN VIEW --- -->
-    <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-24">
+    <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-24" style="z-index: 10;">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.9</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.0</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 active:scale-95"><i data-lucide="history"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 active:scale-95"><i data-lucide="settings"></i></button>
@@ -46,8 +51,8 @@
         <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
             <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow">
-                <p id="nav-instruction" class="font-bold text-sm leading-tight text-white">ドライブ中やで！</p>
-                <p id="nav-dest" class="text-[10px] text-gray-300">安全運転でいこな！</p>
+                <p id="nav-instruction" class="font-bold text-sm leading-tight text-white">ドライブモード</p>
+                <p id="nav-dest" class="text-[10px] text-gray-300">安全運転で行こな！</p>
             </div>
             <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-2 py-1.5 border border-red-400/30 rounded active:bg-red-400/10">停止</button>
         </div>
@@ -64,7 +69,7 @@
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col gap-2 shrink-0">
             <div class="flex justify-between items-start">
                 <span class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3 text-pink-500"></i> 現在の住所</span>
-                <span id="gps-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">信号検索中</span>
+                <span id="gps-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">信号検索中...</span>
             </div>
             <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight">住所を取得中...</div>
             <div class="flex justify-between items-center mt-1">
@@ -92,13 +97,12 @@
         </div>
     </div>
 
-    <!-- AI Container -->
     <div id="ai-container">
         <div id="ai-avatar" class="ai-pulse">
             <div id="ai-loading-icon" class="w-full h-full flex items-center justify-center bg-pink-100 text-pink-500">
                 <i data-lucide="sparkles" class="w-6 h-6 animate-spin"></i>
             </div>
-            <img id="ai-image" class="hidden" alt="Sakura AI Icon">
+            <img id="ai-image" class="hidden" alt="Sakura Icon">
         </div>
         <div id="ai-chat-bubble">
             <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
@@ -110,56 +114,62 @@
         <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
     </button>
 
-    <!-- Map Modal -->
     <div id="map-overlay" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between">
             <button id="close-map-btn" class="font-bold text-gray-600 flex items-center gap-1 active:scale-95"><i data-lucide="arrow-left"></i> 戻る</button>
             <span class="font-black text-pink-600">LIVE MAP</span>
             <div class="w-10"></div>
         </header>
-        <div id="map">
-            <button id="center-btn" class="map-action-btn right-4 bottom-10 bg-white shadow-lg active:bg-gray-100"><i data-lucide="locate-fixed" class="text-pink-600 w-6 h-6"></i></button>
+        <div id="map" class="bg-gray-100">
+            <button id="center-btn" class="map-action-btn right-4 bottom-10 bg-white shadow-xl active:bg-gray-100"><i data-lucide="locate-fixed" class="text-pink-600 w-6 h-6"></i></button>
         </div>
     </div>
 
-    <!-- Settings Modal -->
+    <div id="history-view" class="view-screen">
+        <header class="bg-gray-800 text-white p-4 flex items-center gap-4">
+            <button id="close-history-btn" class="active:scale-95"><i data-lucide="arrow-left"></i></button>
+            <h2 class="font-bold text-lg text-white">過去の記録</h2>
+        </header>
+        <div id="history-list" class="flex-grow overflow-y-auto p-4 flex flex-col gap-3">
+            <p class="text-center text-gray-400 py-10">履歴はここに表示されるで！</p>
+        </div>
+    </div>
+
     <div id="settings-view" class="view-screen">
-        <header class="bg-white p-4 shadow-sm flex items-center justify-between">
+        <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
             <button id="close-settings-btn" class="font-bold text-gray-600 flex items-center gap-1 active:scale-95"><i data-lucide="chevron-left"></i> 戻る</button>
             <h2 class="font-bold">アプリ設定</h2>
             <div class="w-8"></div>
         </header>
-        <div class="p-4 flex flex-col gap-6">
-            <!-- Account Section -->
-            <div class="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col gap-4">
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント</h3>
+        <div class="p-4 flex flex-col gap-6 overflow-y-auto">
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col gap-4 shadow-sm">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">ユーザー</h3>
                 <div id="user-info" class="hidden items-center gap-3">
-                    <div id="user-photo" class="w-10 h-10 rounded-full bg-gray-200 bg-cover"></div>
+                    <div id="user-photo" class="w-12 h-12 rounded-full bg-gray-200 bg-cover"></div>
                     <div class="flex-grow">
-                        <p id="user-name" class="font-bold text-sm">ユーザー名</p>
-                        <p id="user-email" class="text-xs text-gray-400">email@example.com</p>
+                        <p id="user-name" class="font-bold text-sm">読み込み中...</p>
+                        <p id="user-email" class="text-xs text-gray-400">...</p>
                     </div>
                 </div>
-                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95"><i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン</button>
+                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:bg-gray-50 transition-colors"><i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン</button>
             </div>
 
-            <!-- AI Config Section -->
-            <div class="bg-white p-5 rounded-2xl border border-gray-100">
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Gemini API設定</h3>
-                <p class="text-[10px] text-gray-500 mb-2">GitHub Pages等で動かす場合はキーが必要です。</p>
-                <div class="flex flex-col gap-2">
-                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-500 underline mb-2">キーを無料で取得する (Google AI Studio)</a>
-                    <p class="text-[10px] text-red-400">※GitHubへ公開する際はキーの取り扱いに注意してください。</p>
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Gemini AI設定</h3>
+                <div class="flex flex-col gap-3">
+                    <p class="text-xs text-gray-600 leading-relaxed">GitHub Pages等で動かす時はAPIキーを入力してな！</p>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-xs text-blue-500 font-bold underline flex items-center gap-1"><i data-lucide="external-link" class="w-3 h-3"></i> キーを無料で取得する</a>
+                    <button id="regenerate-icon-btn" class="mt-2 bg-pink-50 text-pink-600 py-2 rounded-xl text-xs font-bold active:bg-pink-100">アイコンを描き直す</button>
                 </div>
             </div>
 
-            <!-- Voice Config Section -->
-            <div class="bg-white p-5 rounded-2xl border border-gray-100 flex flex-col gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス</h3>
-                <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-full accent-pink-500">
+                <div class="flex items-center gap-4">
+                    <i data-lucide="volume-2" class="w-4 h-4 text-gray-400"></i>
+                    <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-full accent-pink-500">
+                </div>
             </div>
-
-            <button id="regenerate-icon-btn" class="text-xs text-pink-500 font-bold underline active:scale-95">さくらの見た目を更新する</button>
         </div>
     </div>
 
@@ -170,19 +180,26 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- API CONFIG ---
-        const apiKey = "AIzaSyBfJjkTSQ1LuC6fSqHmuYlMfgWyKDWL8ck"; 
+        // --- API KEY CONFIG ---
+        // GitHub等で動かす場合はここに貼り付けてな！
+        let rawKey = ""; 
+        const apiKey = rawKey.trim(AIzaSyBfJjkTSQ1LuC6fSqHmuYlMfgWyKDWL8ck);
 
-        // State Block
+        // Global States
         let user = null; 
-        let db, auth, appId;
+        let auth, db, appId;
         let map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null, lastAddressFetchTime = 0;
 
-        const views = { main: document.getElementById('main-view'), map: document.getElementById('map-overlay'), settings: document.getElementById('settings-view') };
+        const views = { 
+            main: document.getElementById('main-view'), 
+            map: document.getElementById('map-overlay'), 
+            history: document.getElementById('history-view'),
+            settings: document.getElementById('settings-view') 
+        };
 
-        // --- SAFE FIREBASE INIT ---
+        // Initialize Firebase
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 const firebaseConfig = JSON.parse(__firebase_config);
@@ -190,14 +207,15 @@
                 auth = getAuth(app);
                 db = getFirestore(app);
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                
                 if (auth) {
                     onAuthStateChanged(auth, (u) => { 
-                        user = u; 
+                        user = u;
                         const loginBtn = document.getElementById('google-login-btn');
-                        const userInfo = document.getElementById('user-info');
+                        const infoBlock = document.getElementById('user-info');
                         if (user) {
                             if (loginBtn) loginBtn.classList.add('hidden');
-                            if (userInfo) userInfo.classList.replace('hidden', 'flex');
+                            if (infoBlock) infoBlock.classList.replace('hidden', 'flex');
                             const nameEl = document.getElementById('user-name');
                             const emailEl = document.getElementById('user-email');
                             const photoEl = document.getElementById('user-photo');
@@ -208,18 +226,19 @@
                     });
                 }
             }
-        } catch (e) { console.warn("Firebase config missing."); }
+        } catch (e) { console.warn("Firebase Setup Skipped: Config not found."); }
 
-        // --- Helper: Exponential Backoff API ---
-        async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+        // --- Network Helper ---
+        async function fetchWithRetry(url, options, retries = 3) {
+            let delay = 1000;
             for (let i = 0; i < retries; i++) {
                 try {
                     const response = await fetch(url, options);
                     if (!response.ok) {
                         if (response.status === 401 && apiKey === "") {
-                            throw new Error("APIキーが設定されてへんわ。設定画面からキーを取って貼り付けてな！");
+                            throw new Error("APIキーが空やわ。設定画面から設定してな！");
                         }
-                        throw new Error(`HTTP Error: ${response.status}`);
+                        throw new Error(`Error: ${response.status}`);
                     }
                     return await response.json();
                 } catch (err) {
@@ -230,9 +249,9 @@
             }
         }
 
-        // --- Address Fetch ---
+        // --- Nominatim Address Search ---
         async function updateAddress(lat, lng) {
-            if (Date.now() - lastAddressFetchTime < 10000) return;
+            if (Date.now() - lastAddressFetchTime < 15000) return;
             lastAddressFetchTime = Date.now();
             try {
                 const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
@@ -241,14 +260,14 @@
                 const data = await resp.json();
                 if (data && data.address) {
                     const a = data.address;
-                    lastAddress = [a.province || a.state, a.city || a.town || a.village, a.suburb || a.district].filter(Boolean).join(' ') || "住所詳細不明";
+                    lastAddress = [a.province || a.state, a.city || a.town || a.village, a.suburb || a.district].filter(Boolean).join(' ') || "詳細不明な場所";
                     const el = document.getElementById('address-display');
                     if (el) el.textContent = lastAddress;
                 }
-            } catch (e) { console.warn("Address fetch failed."); }
+            } catch (e) { console.warn("Address Update Failed."); }
         }
 
-        // --- Character Icon ---
+        // --- Sakura Character Drawing ---
         async function generateSakuraIcon() {
             if (apiKey === "") return;
             const prompt = "A cute, energetic Japanese anime-style girl character icon, junior high school student age, long black hair with a cherry blossom hair clip, bright brown eyes, friendly smile, high-quality Japanimation style, vibrant colors, circular framing, white background.";
@@ -257,7 +276,7 @@
                 const data = await fetchWithRetry(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instances: { prompt: prompt }, parameters: { sampleCount: 1 } })
+                    body: JSON.stringify({ instances: { prompt }, parameters: { sampleCount: 1 } })
                 });
                 const base64 = data.predictions?.[0]?.bytesBase64Encoded;
                 if (base64) {
@@ -266,87 +285,86 @@
                     if (img) { img.src = `data:image/png;base64,${base64}`; img.classList.remove('hidden'); }
                     if (loader) loader.classList.add('hidden');
                 }
-            } catch (e) { console.error("Icon Error:", e.message); }
+            } catch (e) { console.warn("Icon Drawing Error."); }
         }
 
-        function showToast(m) { 
-            const t = document.getElementById('toast'); 
-            if (t) { t.textContent = m; t.style.display='block'; setTimeout(() => t.style.display='none', 2000); }
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
         }
 
-        function switchView(target) {
-            Object.values(views).forEach(v => v ? v.classList.remove('active') : null);
-            if (views[target]) views[target].classList.add('active');
-            if(target === 'map' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); }, 200);
-            if(typeof lucide !== 'undefined') lucide.createIcons();
+        function switchView(id) {
+            Object.keys(views).forEach(k => { if(views[k]) views[k].classList.remove('active'); });
+            if (views[id]) views[id].classList.add('active');
+            if (id === 'map' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); }, 200);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
-        function setGPSStatus(isSuccess) {
+        function setGPSStatus(ok) {
             const badge = document.getElementById('gps-status-badge');
             const dot = document.getElementById('status-dot');
             const text = document.getElementById('status-text');
-            if (isSuccess) {
+            if (ok) {
                 if (badge) badge.innerHTML = '<i data-lucide="signal" class="w-2.5 h-2.5"></i> 信号良好';
                 if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-green-500";
                 if (text) { text.textContent = isTracking ? "記録中" : "待機中"; text.className = "font-bold text-green-600"; }
             } else {
-                if (badge) badge.innerHTML = '<i data-lucide="signal-low" class="w-2.5 h-2.5"></i> 信号検索中';
+                if (badge) badge.innerHTML = '<i data-lucide="signal-low" class="w-2.5 h-2.5"></i> 信号検索中...';
                 if (dot) dot.className = "w-2.5 h-2.5 rounded-full bg-gray-400";
-                if (text) { text.textContent = "信号待ち"; text.className = "font-bold text-gray-400"; }
+                if (text) { text.textContent = "GPS探し中"; text.className = "font-bold text-gray-500"; }
             }
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         function updateLocation(pos) {
-            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
             lastSuccessTimestamp = Date.now();
             currentPos = [lat, lng];
             setGPSStatus(true);
             updateAddress(lat, lng);
-            if(marker) marker.setLatLng(currentPos);
-            const locEl = document.getElementById('location-display');
-            const accEl = document.getElementById('accuracy-text');
-            if (locEl) locEl.textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
-            if (accEl) accEl.textContent = `精度: ${Math.round(pos.coords.accuracy)} m`;
             
-            if(isTracking) {
-                if(historyPoints.length > 0) {
+            if (marker) marker.setLatLng(currentPos);
+            const lEl = document.getElementById('location-display');
+            const aEl = document.getElementById('accuracy-text');
+            if (lEl) lEl.textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
+            if (aEl) aEl.textContent = `精度: ${Math.round(accuracy)} m`;
+            
+            if (isTracking) {
+                if (historyPoints.length > 0) {
                     const last = historyPoints[historyPoints.length - 1];
-                    const d = getDistance(last.lat, last.lng, lat, lng);
-                    if(d > 3) {
-                        totalDistance += d;
-                        historyPoints.push({ lat, lng, timestamp: Date.now() });
-                        if(polyline) polyline.addLatLng(currentPos);
+                    const dist = getDistance(last.lat, last.lng, lat, lng);
+                    if (dist > 3) {
+                        totalDistance += dist;
+                        historyPoints.push({ lat, lng, time: Date.now() });
+                        if (polyline) polyline.addLatLng(currentPos);
                     }
-                } else { 
-                    historyPoints.push({ lat, lng, timestamp: Date.now() }); 
-                    if(polyline) polyline.addLatLng(currentPos); 
+                } else {
+                    historyPoints.push({ lat, lng, time: Date.now() });
+                    if (polyline) polyline.addLatLng(currentPos);
                 }
-                const dDisp = document.getElementById('dist-display');
-                const sDisp = document.getElementById('speed-display');
-                if (dDisp) dDisp.textContent = (totalDistance / 1000).toFixed(2);
-                if (sDisp) sDisp.textContent = pos.coords.speed ? (pos.coords.speed * 3.6).toFixed(1) : "0.0";
+                const dD = document.getElementById('dist-display');
+                const sD = document.getElementById('speed-display');
+                if (dD) dD.textContent = (totalDistance / 1000).toFixed(2);
+                if (sD) sD.textContent = speed ? (speed * 3.6).toFixed(1) : "0.0";
             }
         }
 
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLon/2)**2;
+        function getDistance(la1, lo1, la2, lo2) {
+            const R = 6371000, dLa = (la2 - la1) * Math.PI / 180, dLo = (lo2 - lo1) * Math.PI / 180;
+            const a = Math.sin(dLa/2)**2 + Math.cos(la1 * Math.PI/180) * Math.cos(la2 * Math.PI/180) * Math.sin(dLo/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        async function speakText(text) {
-            const bubble = document.getElementById('ai-chat-bubble');
-            const respText = document.getElementById('ai-response-text');
-            if (respText) respText.textContent = text;
-            if (bubble) bubble.style.display = 'block';
+        async function speakText(txt) {
+            const b = document.getElementById('ai-chat-bubble');
+            const r = document.getElementById('ai-response-text');
+            if (r) r.textContent = txt;
+            if (b) b.style.display = 'block';
             
             if (apiKey === "") {
-                const ut = new SpeechSynthesisUtterance(text);
-                ut.lang = 'ja-JP'; ut.volume = voiceVolume;
-                speechSynthesis.speak(ut);
+                const u = new SpeechSynthesisUtterance(txt);
+                u.lang = 'ja-JP'; u.volume = voiceVolume;
+                speechSynthesis.speak(u);
                 return;
             }
 
@@ -356,156 +374,137 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${text}` }] }],
+                        contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
                         generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
                     })
                 });
-                const pcmData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if(pcmData) playWav(pcmData);
+                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (pcm) playWav(pcm);
             } catch(e) {
-                const ut = new SpeechSynthesisUtterance(text);
-                ut.lang = 'ja-JP'; ut.volume = voiceVolume;
-                speechSynthesis.speak(ut);
+                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume; speechSynthesis.speak(u);
             }
         }
 
-        function playWav(base64Pcm) {
-            const binaryString = atob(base64Pcm);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            const sampleRate = 24000;
-            const wavHeader = new ArrayBuffer(44);
-            const view = new DataView(wavHeader);
-            view.setUint32(0, 0x52494646, false); // RIFF
-            view.setUint32(4, 36 + len, true); 
-            view.setUint32(8, 0x57415645, false); // WAVE
-            view.setUint32(12, 0x666d7420, false);// fmt 
-            view.setUint32(16, 16, true); 
-            view.setUint16(20, 1, true); 
-            view.setUint16(22, 1, true); 
-            view.setUint32(24, sampleRate, true); 
-            view.setUint32(28, sampleRate * 2, true); 
-            view.setUint16(32, 2, true); 
-            view.setUint16(34, 16, true); 
-            view.setUint32(36, 0x64617461, false);// data
-            view.setUint32(40, len, true); 
-            const blob = new Blob([wavHeader, bytes], { type: 'audio/wav' });
-            const audio = new Audio(URL.createObjectURL(blob));
+        function playWav(base64) {
+            const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
+            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
+            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
+            const audio = new Audio(URL.createObjectURL(new Blob([hdr, bytes], { type: 'audio/wav' })));
             audio.volume = voiceVolume; audio.play();
         }
 
         async function askSakuraAI(prompt) {
-            if(isAIThinking) return;
+            if (isAIThinking) return;
             isAIThinking = true;
-            const bubble = document.getElementById('ai-chat-bubble');
-            const respText = document.getElementById('ai-response-text');
-            if (bubble) bubble.style.display = 'block';
-            if (respText) respText.textContent = "考え中...";
+            const b = document.getElementById('ai-chat-bubble');
+            const r = document.getElementById('ai-response-text');
+            if (b) b.style.display = 'block';
+            if (r) r.textContent = "考え中...";
             
-            const systemPrompt = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
+            const sys = `あなたは関西弁の女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             
             try {
                 const data = await fetchWithRetry(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        contents: [{ parts: [{ text: prompt }] }], 
-                        systemInstruction: { parts: [{ text: systemPrompt }] } 
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] } })
                 });
-                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if(text) speakText(text);
+                const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (txt) speakText(txt);
             } catch (err) {
-                console.error("AI Error:", err.message);
-                if (respText) respText.textContent = err.message;
+                if (r) r.textContent = err.message;
             } finally { isAIThinking = false; }
         }
 
+        // Mode Switching
         function setMode(mode) {
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            const btn = document.getElementById(`mode-${mode}`);
-            if (btn) btn.classList.add('active');
-            showToast(mode === 'driving' ? "ドライブモード！安全運転！" : "ウォーキングモード！");
+            const b = document.getElementById(`mode-${mode}`);
+            if (b) b.classList.add('active');
+            showToast(mode === 'driving' ? "ドライブモードやで！" : "ウォーキングモードや！");
             const hud = document.getElementById('nav-hud');
             if (hud) hud.style.display = (mode === 'driving' ? 'flex' : 'none');
         }
 
-        document.getElementById('mode-walking').onclick = () => setMode('walking');
-        document.getElementById('mode-driving').onclick = () => setMode('driving');
+        // --- Interaction Setup ---
+        window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('mode-walking').onclick = () => setMode('walking');
+            document.getElementById('mode-driving').onclick = () => setMode('driving');
 
-        document.getElementById('record-toggle-btn').onclick = () => {
-            if(!isTracking) {
-                isTracking = true; startTime = Date.now(); totalDistance = 0; historyPoints = [];
-                if(polyline) polyline.setLatLngs([]);
-                document.getElementById('btn-text').textContent = "記録停止";
-                document.getElementById('record-toggle-btn').classList.replace('bg-green-500', 'bg-red-500');
-                speakText(currentMode === 'driving' ? "ドライブ開始や！安全運転で行こな！" : "お散歩スタート！しっかり付いていくで！");
-                timerInterval = setInterval(() => {
-                    const s = Math.floor((Date.now() - startTime) / 1000);
-                    const el = document.getElementById('time-display');
-                    if (el) el.textContent = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v => v<10?'0'+v:v).join(':');
-                }, 1000);
-            } else {
-                if(confirm("記録を停止する？")) { 
-                    isTracking = false; 
-                    clearInterval(timerInterval);
-                    speakText("お疲れ様！保存しとくで。"); 
-                    document.getElementById('btn-text').textContent = "記録開始";
-                    document.getElementById('record-toggle-btn').classList.replace('bg-red-500', 'bg-green-500');
+            document.getElementById('record-toggle-btn').onclick = () => {
+                if (!isTracking) {
+                    isTracking = true; startTime = Date.now(); totalDistance = 0; historyPoints = [];
+                    if (polyline) polyline.setLatLngs([]);
+                    document.getElementById('btn-text').textContent = "記録停止";
+                    document.getElementById('record-toggle-btn').classList.replace('bg-green-500', 'bg-red-500');
+                    speakText(currentMode === 'driving' ? "ドライブ開始やで！安全運転でいこな！" : "お散歩スタート！しっかりついていくわな！");
+                    timerInterval = setInterval(() => {
+                        const s = Math.floor((Date.now() - startTime) / 1000);
+                        const el = document.getElementById('time-display');
+                        if (el) el.textContent = [Math.floor(s/3600), Math.floor((s%3600)/60), s%60].map(v => v<10?'0'+v:v).join(':');
+                    }, 1000);
+                } else {
+                    if (confirm("記録を停止する？")) { 
+                        isTracking = false; clearInterval(timerInterval);
+                        speakText("お疲れ様！しっかり保存したで。"); 
+                        document.getElementById('btn-text').textContent = "記録開始";
+                        document.getElementById('record-toggle-btn').classList.replace('bg-red-500', 'bg-green-500');
+                    }
                 }
-            }
-        };
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(SpeechRecognition) {
-            const rec = new SpeechRecognition();
-            rec.lang = 'ja-JP';
-            rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
-            const micBtn = document.getElementById('ai-mic-btn');
-            if (micBtn) micBtn.onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
-        }
-
-        document.getElementById('open-settings-btn').onclick = () => switchView('settings');
-        document.getElementById('close-settings-btn').onclick = () => switchView('main');
-        document.getElementById('open-map-btn').onclick = () => switchView('map');
-        document.getElementById('close-map-btn').onclick = () => switchView('main');
-        const regenBtn = document.getElementById('regenerate-icon-btn');
-        if (regenBtn) regenBtn.onclick = () => generateSakuraIcon();
-        const navStopBtn = document.getElementById('stop-nav-btn');
-        if (navStopBtn) navStopBtn.onclick = () => setMode('walking');
-        const centerBtn = document.getElementById('center-btn');
-        if (centerBtn) centerBtn.onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
-        
-        const volSlider = document.getElementById('volume-slider');
-        if (volSlider) volSlider.oninput = (e) => { voiceVolume = e.target.value / 100; };
-        
-        const loginBtn = document.getElementById('google-login-btn');
-        if (loginBtn) {
-            loginBtn.onclick = async () => {
-                if (!auth) { showToast("Firebaseの設定を確認してな！"); return; }
-                const provider = new GoogleAuthProvider();
-                try { await signInWithPopup(auth, provider); showToast("ログイン成功！"); } catch(e) { showToast("ログイン失敗..."); }
             };
-        }
 
-        window.onload = () => {
-            if(typeof lucide !== 'undefined') lucide.createIcons();
+            const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (sr) {
+                const rec = new sr(); rec.lang = 'ja-JP';
+                rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
+                document.getElementById('ai-mic-btn').onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
+            }
+
+            document.getElementById('open-settings-btn').onclick = () => switchView('settings');
+            document.getElementById('close-settings-btn').onclick = () => switchView('main');
+            document.getElementById('open-history-btn').onclick = () => switchView('history');
+            document.getElementById('close-history-btn').onclick = () => switchView('main');
+            document.getElementById('open-map-btn').onclick = () => switchView('map');
+            document.getElementById('close-map-btn').onclick = () => switchView('main');
+            document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
+            document.getElementById('stop-nav-btn').onclick = () => setMode('walking');
+
+            const vs = document.getElementById('volume-slider');
+            if (vs) vs.oninput = (e) => { voiceVolume = e.target.value / 100; };
+
+            const rI = document.getElementById('regenerate-icon-btn');
+            if (rI) rI.onclick = () => generateSakuraIcon();
+
+            const lb = document.getElementById('google-login-btn');
+            if (lb) {
+                lb.onclick = async () => {
+                    if (!auth) { showToast("Firebaseの設定を確認してな！"); return; }
+                    try { await signInWithPopup(auth, new GoogleAuthProvider()); showToast("ログイン成功！"); } 
+                    catch(e) { showToast("ログイン失敗したわ..."); }
+                };
+            }
+
+            // Map Init
             try {
                 map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map);
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
-            } catch(e) { console.warn("Map load failed."); }
+            } catch(e) { console.warn("Map failure."); }
+
             if ("geolocation" in navigator) {
-                navigator.geolocation.watchPosition(updateLocation, (err) => { setGPSStatus(false); }, { enableHighAccuracy: true });
+                navigator.geolocation.watchPosition(updateLocation, () => setGPSStatus(false), { enableHighAccuracy: true });
             }
             setInterval(() => { if (Date.now() - lastSuccessTimestamp > 15000) setGPSStatus(false); }, 5000);
             generateSakuraIcon();
-        };
+            lucide.createIcons();
+        });
     </script>
 </body>
 </html>
-
