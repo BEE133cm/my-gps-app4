@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v16.8 (AI & Icon Stability Fixed)</title>
+    <title>GPS Tracker Pro v17.1 (Security Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -11,7 +11,7 @@
     <style>
         body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f3f4f6; position: fixed; width: 100%; touch-action: manipulation; }
         
-        /* Layout Structure */
+        /* レイアウト構造 */
         .view-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             display: none; flex-direction: column; background: #f3f4f6; 
@@ -19,14 +19,14 @@
         }
         .view-screen.active { display: flex; }
         
-        /* View Priorities */
+        /* 画面の重なり順 */
         #settings-view, #map-overlay { z-index: 100; }
         #main-view { z-index: 10; }
         
         .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; }
         #map { flex-grow: 1; width: 100%; position: relative; z-index: 1; }
         
-        /* AI Companion Container */
+        /* AIキャラクターコンテナ */
         #ai-container { 
             position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 260px; 
             display: flex; align-items: flex-end; gap: 10px; z-index: 80; 
@@ -46,7 +46,7 @@
             pointer-events: auto; border-left: 4px solid #ec4899; 
         }
         
-        /* UI Components */
+        /* UIコンポーネント */
         #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 20; }
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; }
         .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
@@ -60,16 +60,16 @@
 </head>
 <body class="font-sans text-gray-800">
 
-    <!-- --- MAIN VIEW --- -->
+    <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.8</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.1</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
         </header>
 
-        <!-- Mode Selector -->
+        <!-- モード切替 -->
         <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 shrink-0 relative z-20">
             <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all bg-gray-50 text-gray-400">
                 <i data-lucide="footprints" class="w-4 h-4"></i> ウォーキング
@@ -79,14 +79,14 @@
             </button>
         </div>
 
-        <!-- Drive HUD -->
+        <!-- ドライブ用HUD -->
         <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
             <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow"><p class="font-bold text-sm leading-tight text-white">ドライブ中</p></div>
             <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded active:bg-red-400/20 transition-colors">停止</button>
         </div>
 
-        <!-- Stats Card -->
+        <!-- 住所・GPSカード -->
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-pink-500 flex flex-col gap-2 shrink-0">
             <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight">住所を取得中...</div>
             <div id="location-display" class="text-[10px] font-mono text-gray-400">緯度: -- / 経度: --</div>
@@ -114,7 +114,7 @@
         </div>
     </div>
 
-    <!-- AI Interface -->
+    <!-- AIキャラクターインターフェース -->
     <div id="ai-container">
         <div id="ai-avatar" class="ai-pulse">
             <div id="ai-loading-icon" class="text-pink-300"><i data-lucide="sparkles" class="w-8 h-8 animate-spin"></i></div>
@@ -126,12 +126,12 @@
         </div>
     </div>
 
-    <!-- Mic Button -->
+    <!-- マイクボタン -->
     <button id="ai-mic-btn" style="z-index: 120;" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all">
         <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
     </button>
 
-    <!-- Settings Overlay -->
+    <!-- 設定画面 -->
     <div id="settings-view" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
             <button id="close-settings-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="chevron-left"></i> 戻る</button>
@@ -139,7 +139,7 @@
             <div class="w-8"></div>
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
-            <!-- Account -->
+            <!-- アカウント -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント</h3>
                 <div id="user-info" class="hidden items-center gap-3">
@@ -153,15 +153,15 @@
                     <i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン
                 </button>
             </div>
-            <!-- Status -->
+            <!-- API状態 -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                 <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">設定状態</h3>
-                <div id="status-text" class="text-xs font-bold text-red-400">Firebase 設定待ち...</div>
+                <div id="status-text" class="text-xs font-bold text-red-400">APIキーを入力してください</div>
                 <button id="regenerate-icon-btn" class="mt-4 w-full bg-pink-50 text-pink-600 py-3 rounded-xl text-xs font-bold active:bg-pink-100 transition-colors">
                     <i data-lucide="palette" class="inline w-3 h-3 mr-1"></i> さくらのイラストを描き直す
                 </button>
             </div>
-            <!-- Voice -->
+            <!-- 音声設定 -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス設定</h3>
                 <div class="flex items-center gap-4">
@@ -172,7 +172,7 @@
         </div>
     </div>
 
-    <!-- Map Overlay -->
+    <!-- 地図画面 -->
     <div id="map-overlay" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
             <button id="close-map-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="arrow-left"></i> 戻る</button>
@@ -192,12 +192,13 @@
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 【1】ここに Gemini APIキーを貼り付け！
+        // 【重要】新しいAPIキーをここに貼り付けてな！
+        // 漏洩したキーは無効化されているので、必ず新しく作成してください。
         // ==========================================
-        let MY_GEMINI_KEY = "AIzaSyBfJjkTSQ1LuC6fSqHmuYlMfgWyKDWL8ck"; 
+        let MY_GEMINI_KEY = "AIzaSyA4EzoJ-SYbsM76I7kUiSoQY4m_vUBPdwQ"; 
 
         // ==========================================
-        // 【2】ここに Firebaseの設定を丸ごと貼り付け！
+        // 【2】Firebaseの設定（Config）
         // ==========================================
         const MY_FIREBASE_CONFIG = {
   apiKey: "AIzaSyBfZm1AEMpXvKMcOGdgjJlpQQlXnsx39Qk",
@@ -208,19 +209,19 @@
   appId: "1:12221954272:web:31dd55c3b572c813577885"
 }; 
 
-        // Global States
+        // グローバル変数
         let user = null, auth = null, db = null, map = null, marker = null, polyline = null, currentPos = null;
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
 
-        // --- Helper: Get API Key ---
+        // APIキーの取得
         function getEffectiveKey() {
-            const raw = MY_GEMINI_KEY || (typeof apiKey !== 'undefined' ? apiKey : "");
+            const raw = MY_GEMINI_KEY || "";
             return raw.trim();
         }
 
-        // --- Safe Firebase Initialization ---
+        // Firebase初期化
         function initFirebase() {
             try {
                 const config = MY_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
@@ -253,7 +254,7 @@
             }
         }
 
-        // --- API & AI Helper ---
+        // 汎用APIフェッチ関数
         async function apiFetch(url, body, retries = 3) {
             const key = getEffectiveKey();
             if (!key) throw new Error("APIキーが設定されてへんわ！");
@@ -266,21 +267,32 @@
                         headers: { 'Content-Type': 'application/json' }, 
                         body: JSON.stringify(body)
                     });
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    if (!resp.ok) {
+                        const errData = await resp.json().catch(() => ({}));
+                        const message = errData.error?.message || '不明なエラー';
+                        
+                        // キーの漏洩エラーに対する特別な処理
+                        if (resp.status === 403 && message.includes("leaked")) {
+                            throw new Error("このAPIキーは漏洩として無効化されてるわ。新しいキーを発行して貼り直してな！");
+                        }
+                        
+                        throw new Error(`Status: ${resp.status} - ${message}`);
+                    }
                     return await resp.json();
                 } catch (err) {
-                    if (i === retries - 1) throw err;
+                    if (i === retries - 1 || err.message.includes("新しいキーを発行")) throw err;
                     await new Promise(r => setTimeout(r, delay));
                     delay *= 2;
                 }
             }
         }
 
+        // さくらAIへの問い合わせ
         async function askSakuraAI(prompt) {
             if (isAIThinking) return;
             const key = getEffectiveKey();
             if (!key) {
-                speakText("APIキーが設定されてへんから、お喋りできへんねん。設定画面を確認してな！");
+                speakText("APIキーが設定されてへんから、お喋りできへんねん。設定画面からキーを入力してな！");
                 return;
             }
 
@@ -297,12 +309,14 @@
                 if (txt) speakText(txt);
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
-                speakText("ごめん、ちょっと調子悪いわ！ネットの接続とかキーを確認してな。"); 
+                showToast(`エラー: ${err.message}`);
+                speakText("ごめん、ちょっと調子悪いわ！" + (err.message.includes("無効化") ? "キーを新しくしなあかんみたいや。" : "ネットを確認してな。")); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
+        // 音声合成と表示
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -327,6 +341,7 @@
             }
         }
 
+        // 音声再生
         function playAudio(base64) {
             const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
@@ -340,6 +355,7 @@
             audio.volume = voiceVolume; audio.play();
         }
 
+        // キャラクター画像生成
         async function generateSakuraIcon() {
             const key = getEffectiveKey();
             if (!key) return;
@@ -366,14 +382,14 @@
                 }
             } catch (e) { 
                 console.error("Icon Gen Error:", e);
+                showToast(`${e.message}`);
                 if (loader) loader.classList.add('hidden');
-                // Fail fallback: show standard smile icon
                 const loaderIcon = document.getElementById('ai-loading-icon');
                 if (loaderIcon) loaderIcon.classList.remove('hidden');
             }
         }
 
-        // --- Geolocation & Address ---
+        // 住所取得（リバースジオコーディング）
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
             lastAddressFetchTime = Date.now();
@@ -389,6 +405,7 @@
             } catch (e) {}
         }
 
+        // 位置情報の更新
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
             currentPos = [lat, lng];
@@ -409,17 +426,16 @@
             }
         }
 
+        // 2点間の距離計算 (Haversine公式)
         function getDistance(la1, lo1, la2, lo2) {
             const R = 6371000, dLa = (la2 - la1) * Math.PI / 180, dLo = (lo2 - lo1) * Math.PI / 180;
             const a = Math.sin(dLa/2)**2 + Math.cos(la1 * Math.PI/180) * Math.cos(la2 * Math.PI/180) * Math.sin(dLo/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // --- UI Switcher ---
+        // 画面切り替え
         function switchView(id) {
-            document.querySelectorAll('.view-screen').forEach(v => {
-                v.classList.remove('active');
-            });
+            document.querySelectorAll('.view-screen').forEach(v => v.classList.remove('active'));
             const target = document.getElementById(id);
             if (target) {
                 target.classList.add('active');
@@ -430,52 +446,44 @@
             }
         }
 
+        // トースト通知
         function showToast(msg) {
             const t = document.getElementById('toast');
-            if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+            if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 4000); }
         }
 
-        // --- Main Init ---
+        // 初期化処理
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
             
-            // Interaction: View Switching
-            const openSettings = document.getElementById('open-settings-btn');
-            const closeSettings = document.getElementById('close-settings-btn');
-            const openMap = document.getElementById('open-map-btn');
-            const closeMap = document.getElementById('close-map-btn');
+            // ビュー切り替え
+            document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
+            document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
+            document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
+            document.getElementById('close-map-btn').onclick = () => switchView('main-view');
 
-            if(openSettings) openSettings.onclick = () => switchView('settings-view');
-            if(closeSettings) closeSettings.onclick = () => switchView('main-view');
-            if(openMap) openMap.onclick = () => switchView('map-overlay');
-            if(closeMap) closeMap.onclick = () => switchView('main-view');
-
-            // Interaction: Modes
+            // モード切替
             const walkBtn = document.getElementById('mode-walking');
             const driveBtn = document.getElementById('mode-driving');
-            const navHud = document.getElementById('nav-hud');
-
             if(walkBtn) walkBtn.onclick = () => { 
                 currentMode = 'walking'; 
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                 walkBtn.classList.add('active');
-                if(navHud) navHud.style.display = 'none'; 
+                document.getElementById('nav-hud').style.display = 'none'; 
             };
             if(driveBtn) driveBtn.onclick = () => { 
                 currentMode = 'driving'; 
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                 driveBtn.classList.add('active');
-                if(navHud) navHud.style.display = 'flex'; 
+                document.getElementById('nav-hud').style.display = 'flex'; 
             };
-            const stopNav = document.getElementById('stop-nav-btn');
-            if(stopNav) stopNav.onclick = () => { if(navHud) navHud.style.display = 'none'; };
+            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
 
-            // Interaction: Recording
+            // 記録開始・停止
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
                 isTracking = !isTracking;
                 const text = document.getElementById('btn-text');
-                const icon = document.getElementById('btn-icon');
                 if (isTracking) {
                     startTime = Date.now(); totalDistance = 0; historyPoints = []; 
                     if (polyline) polyline.setLatLngs([]);
@@ -490,35 +498,26 @@
                 lucide.createIcons();
             };
 
-            // Interaction: Google Login
-            const googleBtn = document.getElementById('google-login-btn');
-            if(googleBtn) googleBtn.onclick = async () => {
-                if (!auth) { alert("Firebaseの設定を先にやってな！"); return; }
-                const provider = new GoogleAuthProvider();
-                try {
-                    await signInWithPopup(auth, provider);
-                } catch (e) {
-                    console.error("Login Error", e);
-                    alert("ログイン失敗したわ。設定ドメインを確認してみてな。");
-                }
+            // Googleログイン
+            document.getElementById('google-login-btn').onclick = async () => {
+                if (!auth) { alert("Firebaseの設定をしてな！"); return; }
+                try { await signInWithPopup(auth, new GoogleAuthProvider()); } 
+                catch (e) { console.error(e); alert("ログイン失敗: " + e.message); }
             };
 
-            // Interaction: Mic (Gemini AI)
+            // マイク（音声認識）
             const micBtn = document.getElementById('ai-mic-btn');
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition && micBtn) {
-                const rec = new SpeechRecognition();
+            const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (sr && micBtn) {
+                const rec = new sr();
                 rec.lang = 'ja-JP';
                 rec.onstart = () => { micBtn.classList.add('recording'); showToast("喋ってな！"); };
                 rec.onend = () => { micBtn.classList.remove('recording'); };
-                rec.onresult = (e) => { 
-                    const prompt = e.results[0][0].transcript;
-                    askSakuraAI(prompt);
-                };
+                rec.onresult = (e) => { askSakuraAI(e.results[0][0].transcript); };
                 micBtn.onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
             }
 
-            // Map Init
+            // 地図初期化
             try {
                 map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -526,19 +525,21 @@
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
             } catch(e) {}
 
-            // Geolocation Start
+            // 位置情報監視開始
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
             }
 
-            const centerBtn = document.getElementById('center-btn');
-            if(centerBtn) centerBtn.onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
+            document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
+            document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
+            document.getElementById('regenerate-icon-btn').onclick = () => generateSakuraIcon();
             
-            const volSlider = document.getElementById('volume-slider');
-            if(volSlider) volSlider.oninput = (e) => { voiceVolume = e.target.value / 100; };
-            
-            const regenIconBtn = document.getElementById('regenerate-icon-btn');
-            if(regenIconBtn) regenIconBtn.onclick = () => generateSakuraIcon();
+            const keyStatus = document.getElementById('status-text');
+            const effectiveKey = getEffectiveKey();
+            if(effectiveKey) {
+                keyStatus.textContent = "APIキー設定済み！";
+                keyStatus.className = "text-xs font-bold text-green-500";
+            }
             
             generateSakuraIcon();
             lucide.createIcons();
