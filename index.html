@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.12 (Memory & Voice Final Fix)</title>
+    <title>GPS Tracker Pro v17.13 (iOS Mic Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -65,7 +65,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.12</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.13</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                     <i data-lucide="list"></i>
@@ -238,14 +238,12 @@
         let bubbleTimer = null; 
         
         let chatHistory = []; 
-        let audioUnlocked = false; // 音声ロック解除フラグ
+        let audioUnlocked = false; 
 
-        // ★修正ポイント：音声を確実に鳴らすためのロック解除処理
         function unlockAudio() {
             if (audioUnlocked) return;
             const player = document.getElementById('ai-audio-player');
             if(player) {
-                // 無音を再生してオーディオをアクティブにする
                 player.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"; 
                 player.play().catch(() => {});
             }
@@ -359,7 +357,7 @@
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) {
                     chatHistory.push({ role: "model", parts: [{ text: txt }] });
-                    speakText(txt); // ★ここで非同期関数になった speakText を呼ぶ
+                    speakText(txt);
                 }
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
@@ -371,7 +369,6 @@
             }
         }
 
-        // ★修正ポイント：Geminiの高品質な声（Kore）を復活させて、Audio要素で鳴らす！
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -387,7 +384,6 @@
             const key = getEffectiveKey();
             if (key) {
                 try {
-                    // 以前好評だったアニメ声（Kore）のAPIを使用
                     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
                     const data = await apiFetch(url, {
                         contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
@@ -396,17 +392,15 @@
                     const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                     if (pcm) {
                         playAudio(pcm);
-                        return; // 成功したらここで終了
+                        return; 
                     }
                 } catch(e) {
                     console.error("TTS Error:", e);
                 }
             }
-            // APIキーがない、またはTTSがエラーになった場合は標準音声で喋る
             fallbackTTS(txt);
         }
 
-        // スマホ標準の音声読み上げ（フォールバック用）
         function fallbackTTS(txt) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
@@ -421,7 +415,6 @@
             }
         }
 
-        // ★修正ポイント：アンロック済みのAudio要素を使って再生する！
         function playAudio(base64) {
             const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
@@ -588,7 +581,6 @@
             initFirebase();
             updateKeyUI();
             
-            // ★画面を触った瞬間にオーディオのロックを解除する！
             document.body.addEventListener('touchstart', unlockAudio, { once: true });
             document.body.addEventListener('click', unlockAudio, { once: true });
             
@@ -654,7 +646,6 @@
 
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
-                unlockAudio(); // ★ボタンを押した時にも確実にアンロック
                 isTracking = !isTracking;
                 const text = document.getElementById('btn-text');
                 if (isTracking) {
@@ -679,20 +670,51 @@
                 try { await signInWithPopup(auth, provider); } catch (e) { alert("失敗: " + e.message); }
             };
 
+            // ★修正ポイント：iPhoneのマイク専用チューニング！
             const micBtn = document.getElementById('ai-mic-btn');
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr && micBtn) {
                 const rec = new sr();
                 rec.lang = 'ja-JP';
-                rec.onstart = () => { micBtn.classList.add('recording'); showToast("喋ってな！"); };
-                rec.onend = () => { micBtn.classList.remove('recording'); };
+                rec.continuous = false; // 1回喋り終わったらスパッと切る
+                rec.interimResults = false;
+
+                // マイクが青く光って、完全に準備完了した時の合図
+                rec.onstart = () => { 
+                    micBtn.classList.add('recording'); 
+                    showToast("🎙️ ピコン！今や、喋ってな！"); 
+                };
+                
+                rec.onend = () => { 
+                    micBtn.classList.remove('recording'); 
+                };
+
+                // もしうまく起動できんかった時のエラー表示
+                rec.onerror = (e) => { 
+                    micBtn.classList.remove('recording'); 
+                    console.error("Speech error:", e.error);
+                    if (e.error === 'not-allowed') {
+                        showToast("マイクの許可がないみたいやわ！設定確認してな。", true);
+                    } else if (e.error !== 'no-speech') {
+                        showToast("マイクエラーや…もう一回試してみて！", true);
+                    }
+                };
+                
                 rec.onresult = (e) => { 
                     const t = e.results[0][0].transcript;
-                    askSakuraAI(t); 
+                    if(t) askSakuraAI(t); 
                 };
-                micBtn.onclick = () => { 
-                    unlockAudio(); // ★マイクを押した瞬間にアンロック！
-                    try { rec.start(); } catch(e) { rec.stop(); } 
+
+                micBtn.onclick = (e) => { 
+                    e.stopPropagation(); // ダミー音のロック解除処理と同時に動くのを防ぐ！
+                    showToast("⏳ マイク準備中…（iPhoneはちょっと待ってな！）");
+                    try { 
+                        rec.start(); 
+                    } catch(err) { 
+                        // すでに動いてる等のエラーが出た時は、一度止めてからやり直す
+                        rec.stop(); 
+                        setTimeout(() => rec.start(), 300);
+                    } 
                 };
             }
 
