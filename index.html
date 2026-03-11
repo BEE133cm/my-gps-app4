@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v16.7 (Mic & Icon Fixed)</title>
+    <title>GPS Tracker Pro v16.8 (AI & Icon Stability Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -63,7 +63,7 @@
     <!-- --- MAIN VIEW --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.7</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.8</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -194,7 +194,7 @@
         // ==========================================
         // 【1】ここに Gemini APIキーを貼り付け！
         // ==========================================
-        const MY_GEMINI_KEY = "AIzaSyBfJjkTSQ1LuC6fSqHmuYlMfgWyKDWL8ck"; 
+        let MY_GEMINI_KEY = "AIzaSyBfJjkTSQ1LuC6fSqHmuYlMfgWyKDWL8ck"; 
 
         // ==========================================
         // 【2】ここに Firebaseの設定を丸ごと貼り付け！
@@ -213,6 +213,12 @@
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
+
+        // --- Helper: Get API Key ---
+        function getEffectiveKey() {
+            const raw = MY_GEMINI_KEY || (typeof apiKey !== 'undefined' ? apiKey : "");
+            return raw.trim();
+        }
 
         // --- Safe Firebase Initialization ---
         function initFirebase() {
@@ -248,28 +254,50 @@
         }
 
         // --- API & AI Helper ---
-        async function apiFetch(url, body) {
-            if (!MY_GEMINI_KEY) throw new Error("APIキー未設定やで");
-            const resp = await fetch(url + `?key=${MY_GEMINI_KEY}`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-            });
-            if (!resp.ok) throw new Error("API通信エラー");
-            return await resp.json();
+        async function apiFetch(url, body, retries = 3) {
+            const key = getEffectiveKey();
+            if (!key) throw new Error("APIキーが設定されてへんわ！");
+
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const resp = await fetch(`${url}?key=${key}`, {
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(body)
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    return await resp.json();
+                } catch (err) {
+                    if (i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
         }
 
         async function askSakuraAI(prompt) {
-            if (isAIThinking || !MY_GEMINI_KEY) return;
+            if (isAIThinking) return;
+            const key = getEffectiveKey();
+            if (!key) {
+                speakText("APIキーが設定されてへんから、お喋りできへんねん。設定画面を確認してな！");
+                return;
+            }
+
             isAIThinking = true;
             showToast("さくらに相談中...");
             try {
                 const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
-                    contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] }
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`;
+                const data = await apiFetch(url, {
+                    contents: [{ parts: [{ text: prompt }] }], 
+                    systemInstruction: { parts: [{ text: sys }] }
                 });
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) speakText(txt);
             } catch (err) { 
-                speakText("ごめん、ちょっと調子悪いわ！通信環境を確認してな。"); 
+                console.error("Sakura AI Error:", err);
+                speakText("ごめん、ちょっと調子悪いわ！ネットの接続とかキーを確認してな。"); 
             } finally { 
                 isAIThinking = false; 
             }
@@ -281,12 +309,14 @@
             if (resp) resp.textContent = txt;
             if (bubble) bubble.style.display = 'block';
             
-            if (!MY_GEMINI_KEY) { 
+            const key = getEffectiveKey();
+            if (!key) { 
                 const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
                 speechSynthesis.speak(u); return; 
             }
             try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
+                const data = await apiFetch(url, {
                     contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
                     generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
                 });
@@ -311,7 +341,9 @@
         }
 
         async function generateSakuraIcon() {
-            if (!MY_GEMINI_KEY) return;
+            const key = getEffectiveKey();
+            if (!key) return;
+
             const loader = document.getElementById('ai-loading-icon');
             const img = document.getElementById('ai-image');
             if (loader) loader.classList.remove('hidden');
@@ -323,13 +355,21 @@
                 const data = await apiFetch(url, { instances: { prompt }, parameters: { sampleCount: 1 } });
                 const b64 = data.predictions?.[0]?.bytesBase64Encoded;
                 if (b64) {
-                    if (img) { img.src = `data:image/png;base64,${b64}`; img.classList.remove('hidden'); }
-                    if (loader) loader.classList.add('hidden');
+                    if (img) { 
+                        img.src = `data:image/png;base64,${b64}`; 
+                        img.onload = () => {
+                            img.classList.remove('hidden');
+                            if (loader) loader.classList.add('hidden');
+                        };
+                    }
                     showToast("新しいさくらを描いたで！");
                 }
             } catch (e) { 
-                console.warn("Icon gen failed."); 
+                console.error("Icon Gen Error:", e);
                 if (loader) loader.classList.add('hidden');
+                // Fail fallback: show standard smile icon
+                const loaderIcon = document.getElementById('ai-loading-icon');
+                if (loaderIcon) loaderIcon.classList.remove('hidden');
             }
         }
 
@@ -375,7 +415,7 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // --- UI Switcher (Fix for blank screen) ---
+        // --- UI Switcher ---
         function switchView(id) {
             document.querySelectorAll('.view-screen').forEach(v => {
                 v.classList.remove('active');
