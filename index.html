@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.11 (Conversation Memory)</title>
+    <title>GPS Tracker Pro v17.12 (Memory & Voice Final Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -65,7 +65,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.11</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.12</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                     <i data-lucide="list"></i>
@@ -237,8 +237,25 @@
         let lastAddressFetchTime = 0;
         let bubbleTimer = null; 
         
-        // ★会話の記憶を持たせるためのリスト
         let chatHistory = []; 
+        let audioUnlocked = false; // 音声ロック解除フラグ
+
+        // ★修正ポイント：音声を確実に鳴らすためのロック解除処理
+        function unlockAudio() {
+            if (audioUnlocked) return;
+            const player = document.getElementById('ai-audio-player');
+            if(player) {
+                // 無音を再生してオーディオをアクティブにする
+                player.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"; 
+                player.play().catch(() => {});
+            }
+            if ('speechSynthesis' in window) {
+                const u = new SpeechSynthesisUtterance('');
+                u.volume = 0;
+                window.speechSynthesis.speak(u);
+            }
+            audioUnlocked = true;
+        }
 
         function updateNetworkStatus() {
             const statusEl = document.getElementById('network-status');
@@ -319,11 +336,8 @@
             }
 
             isAIThinking = true;
-            
-            // ★ゆーみんの言葉を記憶に追加
             chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             
-            // 記憶が長すぎるとエラーになるから、直近の5往復分(10件)だけに制限
             if (chatHistory.length > 10) {
                 chatHistory = chatHistory.slice(chatHistory.length - 10);
             }
@@ -337,20 +351,18 @@
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
                 
                 const data = await apiFetch(url, {
-                    contents: chatHistory, // ★過去の記憶を全部まとめて送る！
+                    contents: chatHistory,
                     systemInstruction: { parts: [{ text: sys }] },
                     tools: [{ "google_search": {} }]
                 });
                 
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) {
-                    // ★さくらのお返事も記憶に追加
                     chatHistory.push({ role: "model", parts: [{ text: txt }] });
-                    speakText(txt);
+                    speakText(txt); // ★ここで非同期関数になった speakText を呼ぶ
                 }
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
-                // エラーになったら、さっきのゆーみんの言葉を記憶から消す（エラー回避のため）
                 chatHistory.pop();
                 showToast(`会話エラー: ${err.message}`, true); 
                 speakText("ごめんゆーみん、ちょっと電波が悪いみたいやわ。"); 
@@ -359,7 +371,8 @@
             }
         }
 
-        function speakText(txt) {
+        // ★修正ポイント：Geminiの高品質な声（Kore）を復活させて、Audio要素で鳴らす！
+        async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
             if (resp) resp.textContent = txt;
@@ -371,6 +384,30 @@
                 bubble.style.display = 'none';
             }, displayTime);
             
+            const key = getEffectiveKey();
+            if (key) {
+                try {
+                    // 以前好評だったアニメ声（Kore）のAPIを使用
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
+                    const data = await apiFetch(url, {
+                        contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
+                        generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
+                    });
+                    const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    if (pcm) {
+                        playAudio(pcm);
+                        return; // 成功したらここで終了
+                    }
+                } catch(e) {
+                    console.error("TTS Error:", e);
+                }
+            }
+            // APIキーがない、またはTTSがエラーになった場合は標準音声で喋る
+            fallbackTTS(txt);
+        }
+
+        // スマホ標準の音声読み上げ（フォールバック用）
+        function fallbackTTS(txt) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(txt); 
@@ -381,6 +418,27 @@
                 window.speechSynthesis.speak(u); 
             } else {
                 showToast("このブラウザは音声再生に対応してへんみたいやわ…", true);
+            }
+        }
+
+        // ★修正ポイント：アンロック済みのAudio要素を使って再生する！
+        function playAudio(base64) {
+            const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
+            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
+            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
+            const blob = new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' });
+            
+            const player = document.getElementById('ai-audio-player');
+            if(player) {
+                player.src = URL.createObjectURL(blob);
+                player.volume = voiceVolume;
+                player.play().catch(e => {
+                    console.error("Audio Play Error:", e);
+                });
             }
         }
 
@@ -530,6 +588,10 @@
             initFirebase();
             updateKeyUI();
             
+            // ★画面を触った瞬間にオーディオのロックを解除する！
+            document.body.addEventListener('touchstart', unlockAudio, { once: true });
+            document.body.addEventListener('click', unlockAudio, { once: true });
+            
             document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
             document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
             document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
@@ -592,6 +654,7 @@
 
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
+                unlockAudio(); // ★ボタンを押した時にも確実にアンロック
                 isTracking = !isTracking;
                 const text = document.getElementById('btn-text');
                 if (isTracking) {
@@ -627,7 +690,10 @@
                     const t = e.results[0][0].transcript;
                     askSakuraAI(t); 
                 };
-                micBtn.onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
+                micBtn.onclick = () => { 
+                    unlockAudio(); // ★マイクを押した瞬間にアンロック！
+                    try { rec.start(); } catch(e) { rec.stop(); } 
+                };
             }
 
             try {
@@ -645,13 +711,6 @@
             document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
             
             lucide.createIcons();
-            
-            document.body.addEventListener('touchstart', () => {
-                if('speechSynthesis' in window) {
-                    let u = new SpeechSynthesisUtterance('');
-                    u.volume = 0; window.speechSynthesis.speak(u);
-                }
-            }, { once: true });
         });
     </script>
 </body>
