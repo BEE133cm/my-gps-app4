@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.9 (Perfect Voice & History)</title>
+    <title>GPS Tracker Pro v17.10 (Transparent Route & UI Update)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- ★追加: 地図を画像として保存するためのライブラリ -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
         body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f3f4f6; position: fixed; width: 100%; touch-action: manipulation; }
         
-        /* レイアウト構造 */
         .view-screen { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             display: none; flex-direction: column; background: #f3f4f6; 
@@ -21,7 +19,6 @@
         }
         .view-screen.active { display: flex; }
         
-        /* 画面の重なり順 */
         #settings-view, #map-overlay, #history-view { z-index: 100; }
         #main-view { z-index: 10; }
         
@@ -51,7 +48,6 @@
             pointer-events: auto; border-left: 4px solid #ec4899; 
         }
         
-        /* UIコンポーネント */
         #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 20; }
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; }
         .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
@@ -59,19 +55,18 @@
         .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 12px 20px; border-radius: 12px; z-index: 9999; display: none; font-size: 13px; width: 85%; max-width: 400px; text-align: center; line-height: 1.4; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         
         .recording { border: 4px solid #ec4899 !important; background-color: #fce7f3 !important; box-shadow: 0 0 20px rgba(236, 72, 153, 0.5) !important; }
-        
-        /* 履歴リスト用 */
         .history-item { background: white; padding: 16px; border-radius: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; margin-bottom: 12px; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
 
+    <audio id="ai-audio-player" playsinline></audio>
+
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.9</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.10</span></h1>
             <div class="flex gap-2">
-                <!-- ★追加: 記録（履歴）を見るボタン -->
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                     <i data-lucide="list"></i>
                 </button>
@@ -91,16 +86,23 @@
             </button>
         </div>
 
-        <!-- ドライブ用HUD -->
         <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
             <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow"><p class="font-bold text-sm leading-tight text-white">ドライブ中</p></div>
             <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded active:bg-red-400/20 transition-colors">停止</button>
         </div>
 
-        <!-- 住所・GPSカード -->
+        <!-- ★修正ポイント③：住所・GPSカード（ネットワークと精度表示の追加） -->
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-pink-500 flex flex-col gap-2 shrink-0">
-            <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight">住所を取得中...</div>
+            <div class="flex justify-between items-start gap-2">
+                <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight flex-grow">住所を取得中...</div>
+                <div class="flex flex-col items-end gap-1 shrink-0">
+                    <div id="network-status" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600 flex items-center gap-1">
+                        <div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>ONLINE
+                    </div>
+                    <div id="gps-accuracy" class="text-[10px] font-mono font-bold text-gray-400">精度: --m</div>
+                </div>
+            </div>
             <div id="location-display" class="text-[10px] font-mono text-gray-400">緯度: -- / 経度: --</div>
         </div>
 
@@ -126,7 +128,7 @@
         </div>
     </div>
 
-    <!-- ★追加: 記録（履歴）画面 -->
+    <!-- 記録（履歴）画面 -->
     <div id="history-view" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
             <button id="close-history-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="chevron-left"></i> 戻る</button>
@@ -143,7 +145,6 @@
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b shrink-0">
             <button id="close-map-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="arrow-left"></i> 戻る</button>
             <span class="font-black text-pink-600">LIVE MAP</span>
-            <!-- ★追加: 画像として保存ボタン -->
             <button id="save-map-image-btn" class="text-xs font-bold text-pink-500 p-2 active:bg-pink-50 rounded-lg flex items-center gap-1">
                 <i data-lucide="camera" class="w-4 h-4"></i> 保存
             </button>
@@ -155,7 +156,6 @@
 
     <!-- AIキャラクターインターフェース -->
     <div id="ai-container">
-        <!-- ゆーみんがGitHubに上げた画像を読み込むで！ -->
         <div id="ai-avatar">
             <img id="ai-image" src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/64/fdf2f8/ec4899?text=Sakura'">
         </div>
@@ -165,7 +165,7 @@
         </div>
     </div>
 
-    <!-- マイクボタン (スタイルに id 追加) -->
+    <!-- マイクボタン -->
     <button id="ai-mic-btn" style="z-index: 120;" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all">
         <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
     </button>
@@ -236,6 +236,21 @@
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 1.0, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
+        let bubbleTimer = null; // 吹き出しを消すためのタイマー変数
+
+        // ネットワーク状態の監視と表示更新
+        function updateNetworkStatus() {
+            const statusEl = document.getElementById('network-status');
+            if (navigator.onLine) {
+                statusEl.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-green-500"></div>ONLINE';
+                statusEl.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600 flex items-center gap-1';
+            } else {
+                statusEl.innerHTML = '<div class="w-1.5 h-1.5 rounded-full bg-red-500"></div>OFFLINE';
+                statusEl.className = 'text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 flex items-center gap-1';
+            }
+        }
+        window.addEventListener('online', updateNetworkStatus);
+        window.addEventListener('offline', updateNetworkStatus);
 
         function getStoredKey() { return localStorage.getItem('GEMINI_API_KEY')?.trim() || ""; }
         function getEffectiveKey() { return getStoredKey() || MY_GEMINI_KEY.trim(); }
@@ -249,7 +264,7 @@
                     onAuthStateChanged(auth, (u) => { 
                         user = u;
                         updateAuthUI();
-                        if (user) loadHistory(); // ログインしたら履歴を読み込む
+                        if (user) loadHistory();
                     });
                 }
             } catch (e) { console.error("Firebase Auth Init Failed", e); }
@@ -321,48 +336,47 @@
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
                 showToast(`会話エラー: ${err.message}`, true); 
-                speakText("ごめんゆーくん、ちょっと電波が悪いみたいやわ。"); 
+                speakText("ごめんゆーみん、ちょっと電波が悪いみたいやわ。"); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
-        // ★修正ポイント①：絶対に声が出るように、標準の読み上げ（SpeechSynthesis）をメインに変更！
         function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
             if (resp) resp.textContent = txt;
             if (bubble) bubble.style.display = 'block';
             
-            // スマホのブラウザでも確実に鳴るように、標準TTSを直接使うで！
+            // ★修正ポイント①：タイマーで吹き出しを消す処理
+            if (bubbleTimer) clearTimeout(bubbleTimer);
+            // 文字数に応じた時間、最低でも3秒は表示する
+            const displayTime = Math.max(3000, txt.length * 200);
+            bubbleTimer = setTimeout(() => {
+                bubble.style.display = 'none';
+            }, displayTime);
+            
             if ('speechSynthesis' in window) {
-                // 喋る前に一度リセット
                 window.speechSynthesis.cancel();
-                
                 const u = new SpeechSynthesisUtterance(txt); 
                 u.lang = 'ja-JP'; 
                 u.volume = voiceVolume;
-                // 少し高めで元気な声を演出
                 u.pitch = 1.2;
                 u.rate = 1.1;
-                
                 window.speechSynthesis.speak(u); 
             } else {
                 showToast("このブラウザは音声再生に対応してへんみたいやわ…", true);
             }
         }
 
-        // ★修正ポイント④：住所の「丁目」まで詳細に取得する！
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
             lastAddressFetchTime = Date.now();
             try {
-                // zoom=18 を指定して、建物のレベルまで詳細情報を取得
                 const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, { headers: { 'Accept-Language': 'ja' } });
                 const data = await resp.json();
                 if (data && data.address) {
                     const a = data.address;
-                    // 区、町名、丁目、番地などを連結
                     const parts = [
                         a.province || a.state,
                         a.city || a.town || a.village || a.county,
@@ -370,7 +384,7 @@
                         a.quarter,
                         a.road,
                         a.house_number
-                    ].filter(Boolean); // null や undefined を除外
+                    ].filter(Boolean);
                     
                     lastAddress = parts.join('') || "不明な場所";
                     if (document.getElementById('address-display')) document.getElementById('address-display').textContent = lastAddress;
@@ -382,6 +396,17 @@
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
             currentPos = [lat, lng];
             updateAddress(lat, lng);
+            
+            // ★修正ポイント③：GPS精度の表示更新と色変更
+            const accEl = document.getElementById('gps-accuracy');
+            if (accEl) {
+                const accVal = Math.round(accuracy);
+                accEl.textContent = `精度: ${accVal}m`;
+                if (accVal <= 10) accEl.className = 'text-[10px] font-mono font-bold text-green-500';
+                else if (accVal <= 30) accEl.className = 'text-[10px] font-mono font-bold text-yellow-500';
+                else accEl.className = 'text-[10px] font-mono font-bold text-red-500';
+            }
+            
             if (marker) marker.setLatLng(currentPos);
             if (document.getElementById('location-display')) document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
             if (isTracking) {
@@ -408,7 +433,6 @@
                 target.classList.add('active');
                 if (id === 'map-overlay' && map) { setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); }, 200); }
                 
-                // ★修正ポイント③：地図画面と記録画面ではマイクを隠す！
                 const micBtn = document.getElementById('ai-mic-btn');
                 if (micBtn) {
                     micBtn.style.display = (id === 'map-overlay' || id === 'history-view') ? 'none' : 'flex';
@@ -442,7 +466,6 @@
             }
         }
 
-        // ★追加：記録（履歴）を保存する機能
         async function saveRoute() {
             if (!user || !db || historyPoints.length < 2) return;
             try {
@@ -452,24 +475,23 @@
                     distance: totalDistance,
                     startTime: startTime,
                     endTime: Date.now(),
-                    points: JSON.stringify(historyPoints) // 配列は文字列にして保存
+                    points: JSON.stringify(historyPoints)
                 });
-                showToast("ゆーくん、今回の記録をしっかり保存しといたで！");
-                loadHistory(); // 保存したらリストを更新
+                showToast("ゆーみん、今回の記録をしっかり保存しといたで！");
+                loadHistory();
             } catch (e) { console.error("保存エラー:", e); }
         }
 
-        // ★追加：記録（履歴）を読み込んで画面に表示する機能
         async function loadHistory() {
             if (!user || !db) return;
             const listEl = document.getElementById('history-list');
             try {
-                const q = query(collection(db, "routes")); // 本当は userId で絞り込みたいがインデックス不要な簡易版
+                const q = query(collection(db, "routes")); 
                 const querySnapshot = await getDocs(q);
                 let html = '';
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    if(data.userId === user.uid) { // JS側で自分のデータだけ絞り込み
+                    if(data.userId === user.uid) { 
                         const date = new Date(data.startTime).toLocaleString('ja-JP');
                         const distStr = (data.distance / 1000).toFixed(2);
                         const icon = data.mode === 'walking' ? 'footprints' : 'car';
@@ -490,32 +512,41 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            updateNetworkStatus(); // 初回のネットワークチェック
             initFirebase();
             updateKeyUI();
             
-            // 画面切り替えボタンの設定
             document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
             document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
             document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
             document.getElementById('close-map-btn').onclick = () => switchView('main-view');
-            
-            // ★追加：履歴画面の切り替え
             document.getElementById('open-history-btn').onclick = () => switchView('history-view');
             document.getElementById('close-history-btn').onclick = () => switchView('main-view');
 
-            // ★追加：地図を画像として保存
+            // ★修正ポイント②：透過・軌跡のみの画像保存
             document.getElementById('save-map-image-btn').onclick = () => {
-                showToast("地図の写真を撮ってるで！ちょっと待ってな！");
-                // html2canvasを使って、地図の部分を画像に変換
-                html2canvas(document.getElementById('map'), { useCORS: true }).then(canvas => {
+                showToast("ゆーみんの軌跡を写真に撮るで！ちょっと待ってな！");
+                
+                // 背景の地図タイルを一時的に見えなくする（透明にする）
+                const tilePane = document.querySelector('.leaflet-tile-pane');
+                if (tilePane) tilePane.style.opacity = '0';
+                
+                // html2canvasで透過オプション(backgroundColor: null)をつけてキャプチャ
+                html2canvas(document.getElementById('map'), { 
+                    useCORS: true,
+                    backgroundColor: null // これで背景が透明になるで！
+                }).then(canvas => {
                     const link = document.createElement('a');
-                    link.download = `sakura_tracker_${Date.now()}.png`;
+                    link.download = `sakura_route_${Date.now()}.png`;
                     link.href = canvas.toDataURL('image/png');
                     link.click();
-                    showToast("画像を保存したで！アルバム確認してみてな！");
-                    speakText("パシャッ！ええ写真撮れたわ！");
+                    showToast("透過画像を保存したで！アルバム確認してみてな！");
+                    speakText("パシャッ！ゆーみんの歩いた軌跡、ばっちり撮れたわ！");
                 }).catch(e => {
                     showToast("ごめん、保存に失敗してもうた！");
+                }).finally(() => {
+                    // キャプチャが終わったら地図タイルを元に戻す
+                    if (tilePane) tilePane.style.opacity = '1';
                 });
             };
 
@@ -556,14 +587,14 @@
                 if (isTracking) {
                     startTime = Date.now(); totalDistance = 0; historyPoints = []; 
                     if (polyline) polyline.setLatLngs([]);
-                    speakText("よっしゃ、記録開始や！しっかりついていくで、ゆーくん！");
+                    speakText("よっしゃ、記録開始や！しっかりついていくで、ゆーみん！");
                     recordBtn.classList.replace('bg-green-500', 'bg-red-500');
                     if(text) text.textContent = "記録停止";
                 } else {
-                    speakText("お疲れ様！記録を止めたわ。データ保存しとくね！");
+                    speakText("ゆーみん、お疲れ様！記録を止めたわ。データ保存しとくね！");
                     recordBtn.classList.replace('bg-red-500', 'bg-green-500');
                     if(text) text.textContent = "記録開始";
-                    saveRoute(); // ★追加：記録停止時にFirebaseへ保存
+                    saveRoute(); 
                 }
                 lucide.createIcons();
             };
@@ -605,7 +636,6 @@
             
             lucide.createIcons();
             
-            // ★スマホのミュート解除用（念のため残す）
             document.body.addEventListener('touchstart', () => {
                 if('speechSynthesis' in window) {
                     let u = new SpeechSynthesisUtterance('');
