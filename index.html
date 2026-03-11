@@ -295,12 +295,13 @@
 
             isAIThinking = true;
             try {
-                const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+                const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。周辺の施設やナビを頼まれたら、Google検索を使って調べて答えてな。3行以内で返答してな。`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`;
                 
                 const data = await apiFetch(url, {
                     contents: [{ parts: [{ text: prompt }] }], 
-                    systemInstruction: { parts: [{ text: sys }] }
+                    systemInstruction: { parts: [{ text: sys }] },
+                    tools: [{ "google_search": {} }]
                 });
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) speakText(txt);
@@ -319,10 +320,42 @@
             if (resp) resp.textContent = txt;
             if (bubble) bubble.style.display = 'block';
             
-            const u = new SpeechSynthesisUtterance(txt); 
-            u.lang = 'ja-JP'; 
-            u.volume = voiceVolume;
-            speechSynthesis.speak(u); 
+            const key = getEffectiveKey();
+            if (!key) { 
+                const u = new SpeechSynthesisUtterance(txt); 
+                u.lang = 'ja-JP'; 
+                u.volume = voiceVolume;
+                speechSynthesis.speak(u); 
+                return;
+            }
+            
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
+                const data = await apiFetch(url, {
+                    contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
+                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
+                });
+                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (pcm) playAudio(pcm);
+            } catch(e) { 
+                const u = new SpeechSynthesisUtterance(txt); 
+                u.lang = 'ja-JP'; 
+                u.volume = voiceVolume;
+                speechSynthesis.speak(u); 
+            }
+        }
+
+        function playAudio(base64) {
+            const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
+            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
+            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
+            const blob = new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            audio.volume = voiceVolume; audio.play();
         }
 
         async function updateAddress(lat, lng) {
@@ -419,6 +452,22 @@
                     updateKeyUI();
                 }
             };
+
+            const walkBtn = document.getElementById('mode-walking');
+            const driveBtn = document.getElementById('mode-driving');
+            if(walkBtn) walkBtn.onclick = () => { 
+                currentMode = 'walking'; 
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                walkBtn.classList.add('active');
+                document.getElementById('nav-hud').style.display = 'none'; 
+            };
+            if(driveBtn) driveBtn.onclick = () => { 
+                currentMode = 'driving'; 
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                driveBtn.classList.add('active');
+                document.getElementById('nav-hud').style.display = 'flex'; 
+            };
+            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
 
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
