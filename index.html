@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.3 (AI Debug Edition)</title>
+    <title>GPS Tracker Pro v17.4 (Firebase Fixed & Long Toast)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -51,7 +51,7 @@
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; }
         .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
         
-        .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 10px 20px; border-radius: 999px; z-index: 9999; display: none; font-size: 14px; white-space: nowrap; max-width: 80%; text-align: center; }
+        .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 12px 20px; border-radius: 12px; z-index: 9999; display: none; font-size: 13px; width: 85%; max-width: 400px; text-align: center; line-height: 1.4; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         
         .ai-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
@@ -63,7 +63,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.3</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.4</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -146,7 +146,7 @@
                     <h3 class="text-xs font-bold text-pink-500 uppercase tracking-widest">Gemini AI キー設定</h3>
                     <div id="key-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">未設定</div>
                 </div>
-                <p class="text-[10px] text-gray-400 leading-tight">GitHubでの漏洩を防ぐため、キーはブラウザにのみ保存します。</p>
+                <p class="text-[10px] text-gray-400 leading-tight">GeminiのAPIキーを入力して保存してください。</p>
                 <div class="flex flex-col gap-2">
                     <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300 transition-all">
                     <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存する</button>
@@ -206,22 +206,18 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // 【セキュリティ】コードにはキーを書き込みません。
-        // ==========================================
+        // Gemini APIキー (初期値は空、ブラウザに保存します)
         let MY_GEMINI_KEY = ""; 
 
-        // ==========================================
-        // 【2】Firebaseの設定（Config）
-        // ==========================================
+        // Firebaseの設定を固定化
         const MY_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBfZm1AEMpXvKMcOGdgjJlpQQlXnsx39Qk",
-  authDomain: "sakura-gps.firebaseapp.com",
-  projectId: "sakura-gps",
-  storageBucket: "sakura-gps.firebasestorage.app",
-  messagingSenderId: "12221954272",
-  appId: "1:12221954272:web:31dd55c3b572c813577885"
-}; 
+          apiKey: "AIzaSyBfZm1AEMpXvKMcOGdgjJlpQQlXnsx39Qk",
+          authDomain: "sakura-gps.firebaseapp.com",
+          projectId: "sakura-gps",
+          storageBucket: "sakura-gps.firebasestorage.app",
+          messagingSenderId: "12221954272",
+          appId: "1:12221954272:web:31dd55c3b572c813577885"
+        };
 
         // グローバル変数
         let user = null, auth = null, db = null, map = null, marker = null, polyline = null, currentPos = null;
@@ -229,7 +225,6 @@
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
 
-        // ブラウザ保存キー
         function getStoredKey() {
             const saved = localStorage.getItem('GEMINI_API_KEY');
             return saved ? saved.trim() : "";
@@ -242,9 +237,8 @@
         // Firebase初期化
         function initFirebase() {
             try {
-                const config = MY_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
-                if (config) {
-                    const app = initializeApp(config);
+                if (MY_FIREBASE_CONFIG) {
+                    const app = initializeApp(MY_FIREBASE_CONFIG);
                     auth = getAuth(app);
                     db = getFirestore(app);
                     onAuthStateChanged(auth, (u) => { 
@@ -267,7 +261,7 @@
             }
         }
 
-        // 汎用APIフェッチ関数 (リトライ・エラーログ強化)
+        // 汎用APIフェッチ関数 (エラー表示時間を延長)
         async function apiFetch(url, body, retries = 3) {
             const key = getEffectiveKey();
             if (!key) throw new Error("APIキーが未設定です。設定画面から保存してな！");
@@ -288,10 +282,8 @@
                             errDetail = errData.error?.message || '詳細不明のエラー';
                         } catch(e) { errDetail = `Status: ${resp.status}`; }
                         
-                        if (resp.status === 403 && errDetail.includes("leaked")) {
-                            throw new Error("このキーは無効化されています。新しいキーを発行してください。");
-                        }
-                        throw new Error(errDetail);
+                        const modelName = url.includes('generateContent') ? 'gemini-2.5-flash' : 'imagen-4.0';
+                        throw new Error(`[${modelName}] ${errDetail}`);
                     }
                     return await resp.json();
                 } catch (err) {
@@ -306,7 +298,7 @@
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             
-            showToast(`認識: 「${prompt}」`); // 喋った内容を確認
+            showToast(`認識: 「${prompt}」`); 
             
             const key = getEffectiveKey();
             if (!key) {
@@ -327,14 +319,13 @@
                 if (txt) speakText(txt);
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
-                showToast(`エラー: ${err.message}`);
+                showToast(`エラー: ${err.message}`, true); // エラー時は強調
                 speakText("ごめん、ちょっと通信がうまくいってへんみたいやわ。"); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
-        // 音声合成
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -372,7 +363,6 @@
             audio.volume = voiceVolume; audio.play();
         }
 
-        // キャラクター生成
         async function generateSakuraIcon() {
             const key = getEffectiveKey();
             if (!key) return;
@@ -395,11 +385,11 @@
                 }
             } catch (e) { 
                 if (loader) loader.classList.add('hidden');
+                showToast(`画像エラー: ${e.message}`, true);
                 document.getElementById('ai-loading-icon').classList.remove('hidden');
             }
         }
 
-        // 住所取得
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
             lastAddressFetchTime = Date.now();
@@ -447,9 +437,18 @@
             }
         }
 
-        function showToast(msg) {
+        // トースト通知 (表示時間を10秒に変更)
+        function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
-            if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 4000); }
+            if (t) { 
+                t.textContent = msg; 
+                t.style.display = 'block'; 
+                t.style.backgroundColor = isError ? 'rgba(220, 38, 38, 0.95)' : 'rgba(0, 0, 0, 0.9)';
+                // 4秒から10秒に延長
+                setTimeout(() => {
+                    if (t.textContent === msg) t.style.display = 'none';
+                }, 10000); 
+            }
         }
 
         function updateKeyUI() {
@@ -509,7 +508,7 @@
 
             const googleBtn = document.getElementById('google-login-btn');
             if(googleBtn) googleBtn.onclick = async () => {
-                if (!auth) { alert("Firebaseの設定をしてな！"); return; }
+                if (!auth) { alert("Firebaseが初期化できてへんわ！"); return; }
                 const provider = new GoogleAuthProvider();
                 try { await signInWithPopup(auth, provider); } catch (e) { alert("失敗: " + e.message); }
             };
