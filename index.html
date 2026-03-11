@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.4 (Firebase Fixed & Long Toast)</title>
+    <title>GPS Tracker Pro v17.5 (API Model Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -63,7 +63,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.4</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.5</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -282,8 +282,7 @@
                             errDetail = errData.error?.message || '詳細不明のエラー';
                         } catch(e) { errDetail = `Status: ${resp.status}`; }
                         
-                        const modelName = url.includes('generateContent') ? 'gemini-2.5-flash' : 'imagen-4.0';
-                        throw new Error(`[${modelName}] ${errDetail}`);
+                        throw new Error(`[API Error] ${errDetail}`);
                     }
                     return await resp.json();
                 } catch (err) {
@@ -294,7 +293,7 @@
             }
         }
 
-        // AI問い合わせ (音声認識結果の表示追加)
+        // AI問い合わせ (正式版モデルに修正！)
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             
@@ -310,7 +309,10 @@
             isAIThinking = true;
             try {
                 const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`;
+                
+                // ★修正箇所: 正式版の gemini-2.5-flash または gemini-1.5-flash を使用
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+                
                 const data = await apiFetch(url, {
                     contents: [{ parts: [{ text: prompt }] }], 
                     systemInstruction: { parts: [{ text: sys }] }
@@ -319,13 +321,14 @@
                 if (txt) speakText(txt);
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
-                showToast(`エラー: ${err.message}`, true); // エラー時は強調
+                showToast(`会話エラー: ${err.message}`, true); 
                 speakText("ごめん、ちょっと通信がうまくいってへんみたいやわ。"); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
+        // 音声合成 (標準ブラウザTTSへフォールバックを強化)
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -333,36 +336,15 @@
             if (bubble) bubble.style.display = 'block';
             
             const key = getEffectiveKey();
-            if (!key) { 
-                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
-                speechSynthesis.speak(u); return; 
-            }
-            try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
-                const data = await apiFetch(url, {
-                    contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
-                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
-                });
-                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (pcm) playAudio(pcm);
-            } catch(e) { 
-                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume; speechSynthesis.speak(u); 
-            }
+            // Google CloudのTTSはプレビュー機能なため、外部APIキーでは弾かれやすいので
+            // 標準のブラウザ音声合成(SpeechSynthesis)を確実に使うようにします
+            const u = new SpeechSynthesisUtterance(txt); 
+            u.lang = 'ja-JP'; 
+            u.volume = voiceVolume;
+            speechSynthesis.speak(u); 
         }
 
-        function playAudio(base64) {
-            const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
-            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
-            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
-            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
-            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
-            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
-            const blob = new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' });
-            const audio = new Audio(URL.createObjectURL(blob));
-            audio.volume = voiceVolume; audio.play();
-        }
-
+        // キャラクター生成 (正式版モデルの可能性を探るか、フォールバック)
         async function generateSakuraIcon() {
             const key = getEffectiveKey();
             if (!key) return;
@@ -372,6 +354,7 @@
             if (img) img.classList.add('hidden');
             
             try {
+                // 画像生成も外部環境で安定しやすいプロンプトと設定
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`;
                 const prompt = "A cute, energetic Japanese anime girl, middle school student, long black hair with a cherry blossom hair clip, bright brown eyes, stylish pink hoodie, smiling warmly, high quality, circular profile picture style.";
                 const data = await apiFetch(url, { instances: { prompt }, parameters: { sampleCount: 1 } });
@@ -444,7 +427,6 @@
                 t.textContent = msg; 
                 t.style.display = 'block'; 
                 t.style.backgroundColor = isError ? 'rgba(220, 38, 38, 0.95)' : 'rgba(0, 0, 0, 0.9)';
-                // 4秒から10秒に延長
                 setTimeout(() => {
                     if (t.textContent === msg) t.style.display = 'none';
                 }, 10000); 
