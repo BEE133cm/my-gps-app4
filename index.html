@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v15.4 (User Defined & Drive Fixed)</title>
+    <title>GPS Tracker Pro v15.6 (HUD Layout Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -26,9 +26,19 @@
         .ai-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
         
-        #nav-hud { position: fixed; top: 80px; left: 20px; right: 20px; background: rgba(30, 41, 59, 0.95); color: white; padding: 12px 20px; border-radius: 16px; display: none; z-index: 25; backdrop-filter: blur(8px); }
-        .mode-btn.active { background-color: #ec4899; color: white; border-color: #ec4899; }
+        /* Nav HUD - Adjusted to be part of flow */
+        #nav-hud { 
+            display: none; 
+            background: rgba(30, 41, 59, 0.95); 
+            color: white; 
+            padding: 16px; 
+            border-radius: 20px; 
+            z-index: 25; 
+            backdrop-filter: blur(8px); 
+            margin-bottom: 4px;
+        }
         
+        .mode-btn.active { background-color: #ec4899; color: white; border-color: #ec4899; }
         .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
     </style>
 </head>
@@ -37,35 +47,35 @@
     <!-- --- MAIN RECORD PAGE --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-24">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.4</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.6</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="history"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="settings"></i></button>
             </div>
         </header>
 
-        <!-- Navigation HUD -->
-        <div id="nav-hud" class="flex items-center gap-4">
-            <div class="bg-pink-500 p-2 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
+        <!-- Navigation HUD (Integrated into flow) -->
+        <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
+            <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow">
                 <p id="nav-instruction" class="font-bold text-sm leading-tight text-white">道案内を開始するで</p>
                 <p id="nav-dest" class="text-[10px] text-gray-300">目的地を教えてな！</p>
             </div>
-            <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-2 py-1 border border-red-400/30 rounded active:bg-red-400/10 transition-colors">停止</button>
+            <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-2 py-1.5 border border-red-400/30 rounded active:bg-red-400/10">停止</button>
         </div>
 
         <!-- Mode Selector -->
-        <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
-            <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all border border-transparent active:scale-95">
+        <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 shrink-0">
+            <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all border border-transparent active:scale-95">
                 <i data-lucide="footprints" class="w-4 h-4"></i> ウォーキング
             </button>
-            <button id="mode-driving" class="mode-btn flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all border border-transparent active:scale-95">
+            <button id="mode-driving" class="mode-btn flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all border border-transparent active:scale-95">
                 <i data-lucide="car" class="w-4 h-4"></i> ドライブ
             </button>
         </div>
 
         <!-- Current Location Card -->
-        <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col gap-2">
+        <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col gap-2 shrink-0">
             <div class="flex justify-between items-start">
                 <span class="text-[10px] font-bold text-gray-400 uppercase flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3 text-pink-500"></i> 現在の住所</span>
                 <span id="gps-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 flex items-center gap-1">検索中</span>
@@ -80,15 +90,15 @@
         </div>
 
         <!-- Stats Grid -->
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-4 shrink-0">
             <div class="stat-card"><span class="text-[10px] font-bold text-gray-400 uppercase mb-1">距離</span><div class="flex items-baseline gap-1"><span id="dist-display" class="text-3xl font-black text-pink-600">0.00</span><span class="text-xs font-bold text-gray-400">km</span></div></div>
             <div class="stat-card"><span class="text-[10px] font-bold text-gray-400 uppercase mb-1">速度</span><div class="flex items-baseline gap-1"><span id="speed-display" class="text-3xl font-black text-orange-500">0.0</span><span class="text-xs font-bold text-gray-400">km/h</span></div></div>
             <div class="stat-card col-span-2"><span class="text-[10px] font-bold text-gray-400 uppercase mb-1">経過時間</span><span id="time-display" class="text-4xl font-black text-gray-700">00:00:00</span></div>
         </div>
 
-        <button id="open-map-btn" class="w-full bg-white border-2 border-pink-500 text-pink-600 font-black py-4 rounded-2xl shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all"><i data-lucide="map"></i>地図を確認する</button>
+        <button id="open-map-btn" class="w-full bg-white border-2 border-pink-500 text-pink-600 font-black py-4 rounded-2xl shadow-sm flex items-center justify-center gap-3 active:scale-95 transition-all shrink-0"><i data-lucide="map"></i>地図を確認する</button>
 
-        <div class="flex flex-col gap-3 mt-auto">
+        <div class="flex flex-col gap-3 mt-auto shrink-0">
             <div class="bg-white border border-gray-100 p-3 rounded-xl flex justify-between items-center text-xs shadow-sm mb-1">
                 <div class="flex items-center gap-2"><span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-green-500"></span><span id="status-text" class="font-bold text-green-600">待機中</span></div>
                 <div id="accuracy-text" class="text-gray-400 font-medium">精度: -- m</div>
@@ -170,9 +180,18 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- API CONFIG ---
         const apiKey = ""; 
+
+        // State Block
+        let user = null; 
         let db, auth, appId;
-        
+        let map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
+        let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
+        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null;
+
+        const views = { main: document.getElementById('main-view'), map: document.getElementById('map-overlay'), history: document.getElementById('history-view'), settings: document.getElementById('settings-view') };
+
         // --- SAFE FIREBASE INIT ---
         try {
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -182,19 +201,24 @@
                 db = getFirestore(app);
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
             }
-        } catch (e) { console.warn("Firebase config missing or invalid."); }
+        } catch (e) { console.warn("Firebase config missing."); }
 
         // --- Helper: Exponential Backoff API ---
         async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
             for (let i = 0; i < retries; i++) {
                 try {
                     const response = await fetch(url, options);
-                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    if (!response.ok) {
+                        if (response.status === 401 && apiKey === "") {
+                            throw new Error("APIキーが設定されてへんわ。コードの 'const apiKey' に入れてな！");
+                        }
+                        throw new Error(`HTTP Error: ${response.status}`);
+                    }
                     const text = await response.text();
                     if (!text) throw new Error("Empty response");
                     return JSON.parse(text);
                 } catch (err) {
-                    if (i === retries - 1) throw err;
+                    if (i === retries - 1 || err.message.includes("APIキー")) throw err;
                     await new Promise(resolve => setTimeout(resolve, delay));
                     delay *= 2;
                 }
@@ -215,7 +239,7 @@
                 const data = await fetchWithRetry(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instances: { prompt }, parameters: { sampleCount: 1 } })
+                    body: JSON.stringify({ instances: { prompt: prompt }, parameters: { sampleCount: 1 } })
                 });
                 const base64 = data.predictions?.[0]?.bytesBase64Encoded;
                 if (base64) {
@@ -223,16 +247,8 @@
                     if (img) { img.src = iconUrl; img.classList.remove('hidden'); }
                     if (loader) loader.classList.add('hidden');
                 }
-            } catch (e) { console.error("Icon Error:", e); }
+            } catch (e) { console.error("Icon Error:", e.message); }
         }
-
-        // State
-        let user = null; // FIXED: Missing variable definition
-        let map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
-        let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
-        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null;
-
-        const views = { main: document.getElementById('main-view'), map: document.getElementById('map-overlay'), history: document.getElementById('history-view'), settings: document.getElementById('settings-view') };
 
         function showToast(m) { 
             const t = document.getElementById('toast'); 
@@ -298,9 +314,7 @@
             currentPos = [lat, lng];
             setGPSStatus(true);
             if (isTracking) requestWakeLock();
-            
             if(marker) marker.setLatLng(currentPos);
-            
             document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
             document.getElementById('accuracy-text').textContent = `精度: ${Math.round(pos.coords.accuracy)} m`;
             
@@ -338,7 +352,10 @@
             
             const payload = {
                 contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${text}` }] }],
-                generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
+                generationConfig: { 
+                    responseModalities: ["AUDIO"], 
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } 
+                }
             };
 
             try {
@@ -351,6 +368,7 @@
                 const pcmData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if(pcmData) playWav(pcmData);
             } catch(e) {
+                console.warn("TTS Error, falling back to system voice.");
                 const ut = new SpeechSynthesisUtterance(text);
                 ut.lang = 'ja-JP'; ut.volume = voiceVolume;
                 speechSynthesis.speak(ut);
@@ -362,7 +380,23 @@
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-            const blob = new Blob([bytes], { type: 'audio/wav' });
+            const sampleRate = 24000;
+            const wavHeader = new ArrayBuffer(44);
+            const view = new DataView(wavHeader);
+            view.setUint32(0, 0x52494646, false); // RIFF
+            view.setUint32(4, 36 + len, true); 
+            view.setUint32(8, 0x57415645, false); // WAVE
+            view.setUint32(12, 0x666d7420, false);// fmt 
+            view.setUint32(16, 16, true); 
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
+            view.setUint32(24, sampleRate, true); 
+            view.setUint32(28, sampleRate * 2, true); 
+            view.setUint16(32, 2, true); 
+            view.setUint16(34, 16, true); 
+            view.setUint32(36, 0x64617461, false);// data
+            view.setUint32(40, len, true); 
+            const blob = new Blob([wavHeader, bytes], { type: 'audio/wav' });
             const url = URL.createObjectURL(blob);
             const audio = new Audio(url);
             audio.volume = voiceVolume; audio.play();
@@ -383,19 +417,22 @@
                 const data = await fetchWithRetry(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: systemPrompt }] } })
+                    body: JSON.stringify({ 
+                        contents: [{ parts: [{ text: prompt }] }], 
+                        systemInstruction: { parts: [{ text: systemPrompt }] } 
+                    })
                 });
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if(text) speakText(text);
                 else if (respText) respText.textContent = "ちょっと分からへんかったわ...";
             } catch (err) {
-                console.error("AI Error:", err);
-                if (respText) respText.textContent = "ごめん、通信エラーやわ。";
+                console.error("AI Error:", err.message);
+                if (respText) respText.textContent = err.message.includes("401") ? err.message : "ごめん、通信エラーやわ。";
             } finally { isAIThinking = false; }
         }
 
         // --- Auth Guard ---
-        if (auth) {
+        if (typeof auth !== 'undefined' && auth) {
             onAuthStateChanged(auth, (u) => {
                 user = u;
                 const loginBtn = document.getElementById('google-login-btn');
@@ -417,7 +454,9 @@
             const activeBtn = document.getElementById(`mode-${mode}`);
             if (activeBtn) activeBtn.classList.add('active');
             showToast(mode === 'driving' ? "ドライブモードやで！安全運転！" : "ウォーキングモードやで");
-            document.getElementById('nav-hud').style.display = (mode === 'driving' ? 'flex' : 'none');
+            // HUD Visibility
+            const hud = document.getElementById('nav-hud');
+            if (hud) hud.style.display = (mode === 'driving' ? 'flex' : 'none');
         }
 
         document.getElementById('mode-walking').onclick = () => setMode('walking');
@@ -463,6 +502,7 @@
         document.getElementById('open-map-btn').onclick = () => switchView('map');
         document.getElementById('close-map-btn').onclick = () => switchView('main');
         document.getElementById('regenerate-icon-btn').onclick = () => generateSakuraIcon();
+        document.getElementById('stop-nav-btn').onclick = () => { setMode('walking'); };
         
         document.getElementById('google-login-btn').onclick = async () => {
             if (!auth) { showToast("Firebaseの設定を確認してな！"); return; }
@@ -474,14 +514,12 @@
 
         window.onload = () => {
             if(typeof lucide !== 'undefined') lucide.createIcons();
-            
             try {
                 map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map);
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
             } catch(e) { console.warn("Map load failed."); }
-            
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(updateLocation, (err) => { setGPSStatus(false); }, { enableHighAccuracy: true });
             }
