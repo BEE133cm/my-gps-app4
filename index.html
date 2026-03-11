@@ -3,35 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v16.5 (Firebase Config Place)</title>
+    <title>GPS Tracker Pro v16.6 (Tab & Login Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f3f4f6; position: fixed; width: 100%; touch-action: manipulation; }
-        .view-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; background: #f3f4f6; z-index: 10; }
+        
+        /* Layout Structure */
+        .view-screen { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            display: none; flex-direction: column; background: #f3f4f6; 
+            z-index: 10; 
+        }
         .view-screen.active { display: flex; }
+        
+        /* View Priorities */
         #settings-view, #map-overlay { z-index: 100; }
+        #main-view { z-index: 10; }
+        
         .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; }
         #map { flex-grow: 1; width: 100%; position: relative; z-index: 1; }
-        #ai-container { position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 260px; display: flex; align-items: flex-end; gap: 10px; z-index: 80; pointer-events: none; }
-        #ai-avatar { width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; overflow: hidden; shrink-0; pointer-events: auto; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        
+        /* AI Companion Container */
+        #ai-container { 
+            position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 260px; 
+            display: flex; align-items: flex-end; gap: 10px; z-index: 80; 
+            pointer-events: none; transition: all 0.3s ease; 
+        }
+        #ai-avatar { 
+            width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; 
+            overflow: hidden; shrink-0; pointer-events: auto; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
         #ai-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        #ai-chat-bubble { background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; pointer-events: auto; border-left: 4px solid #ec4899; }
+        
+        #ai-chat-bubble { 
+            background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; 
+            pointer-events: auto; border-left: 4px solid #ec4899; 
+        }
+        
+        /* UI Components */
         #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 20; }
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; }
+        .map-action-btn { position: absolute; z-index: 1000; background: white; padding: 12px; border-radius: 50%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); border: none; }
+        
         .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); color: white; padding: 10px 20px; border-radius: 999px; z-index: 9999; display: none; font-size: 14px; white-space: nowrap; }
+        
+        .ai-pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .recording { border: 3px solid #ec4899 !important; background-color: #fce7f3 !important; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
 
+    <!-- --- MAIN VIEW --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.5</span></h1>
-            <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.6</span></h1>
+            <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
+                <i data-lucide="settings"></i>
+            </button>
         </header>
 
+        <!-- Mode Selector -->
         <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 shrink-0 relative z-20">
             <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all bg-gray-50 text-gray-400">
                 <i data-lucide="footprints" class="w-4 h-4"></i> ウォーキング
@@ -41,61 +79,104 @@
             </button>
         </div>
 
+        <!-- Drive HUD -->
         <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
             <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow"><p class="font-bold text-sm leading-tight text-white">ドライブ中</p></div>
-            <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded">停止</button>
+            <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded active:bg-red-400/20 transition-colors">停止</button>
         </div>
 
+        <!-- Stats Card -->
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-pink-500 flex flex-col gap-2 shrink-0">
             <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight">住所を取得中...</div>
             <div id="location-display" class="text-[10px] font-mono text-gray-400">緯度: -- / 経度: --</div>
         </div>
 
         <div class="grid grid-cols-2 gap-4 shrink-0">
-            <div class="stat-card"><span class="text-[10px] font-bold text-gray-400 uppercase mb-1">距離</span><div class="flex items-baseline gap-1"><span id="dist-display" class="text-3xl font-black text-pink-600">0.00</span><span class="text-xs font-bold text-gray-400">km</span></div></div>
-            <div class="stat-card"><span class="text-[10px] font-bold text-gray-400 uppercase mb-1">速度</span><div class="flex items-baseline gap-1"><span id="speed-display" class="text-3xl font-black text-orange-500">0.0</span><span class="text-xs font-bold text-gray-400">km/h</span></div></div>
+            <div class="stat-card">
+                <span class="text-[10px] font-bold text-gray-400 uppercase mb-1">距離</span>
+                <div class="flex items-baseline gap-1"><span id="dist-display" class="text-3xl font-black text-pink-600">0.00</span><span class="text-xs font-bold text-gray-400">km</span></div>
+            </div>
+            <div class="stat-card">
+                <span class="text-[10px] font-bold text-gray-400 uppercase mb-1">速度</span>
+                <div class="flex items-baseline gap-1"><span id="speed-display" class="text-3xl font-black text-orange-500">0.0</span><span class="text-xs font-bold text-gray-400">km/h</span></div>
+            </div>
         </div>
 
-        <button id="open-map-btn" class="w-full bg-white border-2 border-pink-500 text-pink-600 font-black py-4 rounded-2xl flex items-center justify-center gap-3 active:bg-pink-50 transition-all shrink-0"><i data-lucide="map"></i>地図を確認</button>
+        <button id="open-map-btn" class="w-full bg-white border-2 border-pink-500 text-pink-600 font-black py-4 rounded-2xl flex items-center justify-center gap-3 active:bg-pink-50 transition-all shrink-0">
+            <i data-lucide="map"></i>地図を確認
+        </button>
 
         <div class="flex flex-col gap-3 mt-auto shrink-0 pb-6 relative z-30">
-            <button id="record-toggle-btn" class="w-full bg-green-500 text-white font-black py-6 rounded-3xl shadow-lg text-xl active:scale-95 flex items-center justify-center gap-3 transition-all"><i data-lucide="play"></i><span>記録開始</span></button>
+            <button id="record-toggle-btn" class="w-full bg-green-500 text-white font-black py-6 rounded-3xl shadow-lg text-xl active:scale-95 flex items-center justify-center gap-3 transition-all">
+                <i data-lucide="play" id="btn-icon"></i><span id="btn-text">記録開始</span>
+            </button>
         </div>
     </div>
 
+    <!-- AI Interface -->
     <div id="ai-container">
-        <div id="ai-avatar"><div id="ai-loading-icon" class="text-pink-300"><i data-lucide="smile" class="w-8 h-8"></i></div><img id="ai-image" class="hidden"></div>
-        <div id="ai-chat-bubble"><p id="ai-response-text" class="text-sm font-bold text-gray-700"></p></div>
+        <div id="ai-avatar" class="ai-pulse">
+            <div id="ai-loading-icon" class="text-pink-300"><i data-lucide="smile" class="w-8 h-8"></i></div>
+            <img id="ai-image" class="hidden" alt="さくら">
+        </div>
+        <div id="ai-chat-bubble">
+            <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
+            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">なんや、御用かな？</p>
+        </div>
     </div>
 
-    <button id="ai-mic-btn" style="z-index: 120;" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-90"><i data-lucide="mic" class="w-8 h-8"></i></button>
+    <!-- Mic Button -->
+    <button id="ai-mic-btn" style="z-index: 120;" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-90 transition-all">
+        <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
+    </button>
 
+    <!-- Settings Overlay -->
     <div id="settings-view" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
-            <button id="close-settings-btn" class="font-bold text-gray-600 p-2"><i data-lucide="chevron-left"></i> 戻る</button>
+            <button id="close-settings-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="chevron-left"></i> 戻る</button>
             <h2 class="font-bold">アプリ設定</h2>
             <div class="w-8"></div>
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
+            <!-- Account -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                <h3 class="text-xs font-bold text-gray-400 uppercase">ユーザー</h3>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント</h3>
                 <div id="user-info" class="hidden items-center gap-3">
                     <div id="user-photo" class="w-12 h-12 rounded-full bg-gray-200 bg-cover"></div>
-                    <div><p id="user-name" class="font-bold text-sm"></p><p id="user-email" class="text-xs text-gray-400"></p></div>
+                    <div>
+                        <p id="user-name" class="font-bold text-sm"></p>
+                        <p id="user-email" class="text-xs text-gray-400"></p>
+                    </div>
                 </div>
-                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2"><i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン</button>
+                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:bg-gray-50">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン
+                </button>
             </div>
+            <!-- Status -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                 <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">設定状態</h3>
-                <div id="status-text" class="text-xs font-bold">確認中...</div>
+                <div id="status-text" class="text-xs font-bold text-red-400">Firebase 設定待ち...</div>
+                <p class="text-[10px] text-gray-400 mt-2">※ログインできない場合は設定値を確認してな！</p>
+            </div>
+            <!-- Voice -->
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス</h3>
+                <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-full accent-pink-500">
             </div>
         </div>
     </div>
 
+    <!-- Map Overlay -->
     <div id="map-overlay" class="view-screen">
-        <header class="bg-white p-4 flex items-center justify-between"><button id="close-map-btn" class="p-2"><i data-lucide="arrow-left"></i></button><span class="font-bold">地図</span><div class="w-8"></div></header>
-        <div id="map"></div>
+        <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b">
+            <button id="close-map-btn" class="font-bold text-gray-600 p-2 active:bg-gray-100 rounded-lg"><i data-lucide="arrow-left"></i> 戻る</button>
+            <span class="font-black text-pink-600">LIVE MAP</span>
+            <div class="w-8"></div>
+        </header>
+        <div id="map">
+            <button id="center-btn" class="map-action-btn right-4 bottom-10 bg-white shadow-xl active:bg-gray-100"><i data-lucide="locate-fixed" class="text-pink-600 w-6 h-6"></i></button>
+        </div>
     </div>
 
     <div id="toast" class="custom-toast"></div>
@@ -121,41 +202,103 @@
   messagingSenderId: "12221954272",
   appId: "1:12221954272:web:31dd55c3b572c813577885"
 }; 
-        /* 例: 
-        const MY_FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", ... };
-        */
 
-        let user = null, auth, db, map = null, marker = null, polyline = null, currentPos = null;
+        // Global States
+        let user = null, auth = null, db = null, map = null, marker = null, polyline = null, currentPos = null;
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
-        let lastSuccessTimestamp = 0, lastAddressFetchTime = 0;
+        let lastAddressFetchTime = 0;
 
-        try {
-            const config = MY_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
-            if (config) {
-                const app = initializeApp(config);
-                auth = getAuth(app); db = getFirestore(app);
-                onAuthStateChanged(auth, (u) => { 
-                    user = u;
-                    if (user) {
-                        document.getElementById('google-login-btn').classList.add('hidden');
-                        document.getElementById('user-info').classList.replace('hidden', 'flex');
-                        document.getElementById('user-name').textContent = user.displayName;
-                        document.getElementById('user-email').textContent = user.email;
-                        if (user.photoURL) document.getElementById('user-photo').style.backgroundImage = `url(${user.photoURL})`;
-                    }
-                });
+        // --- Safe Firebase Initialization ---
+        function initFirebase() {
+            try {
+                const config = MY_FIREBASE_CONFIG || (typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null);
+                if (config) {
+                    const app = initializeApp(config);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+                    onAuthStateChanged(auth, (u) => { 
+                        user = u;
+                        updateAuthUI();
+                    });
+                    document.getElementById('status-text').textContent = "Firebase 設定済み！";
+                    document.getElementById('status-text').className = "text-xs font-bold text-green-500";
+                }
+            } catch (e) { console.error("Firebase Auth Init Failed", e); }
+        }
+
+        function updateAuthUI() {
+            const loginBtn = document.getElementById('google-login-btn');
+            const info = document.getElementById('user-info');
+            if (user && loginBtn && info) {
+                loginBtn.classList.add('hidden');
+                info.classList.remove('hidden'); info.classList.add('flex');
+                document.getElementById('user-name').textContent = user.displayName;
+                document.getElementById('user-email').textContent = user.email;
+                if (user.photoURL) document.getElementById('user-photo').style.backgroundImage = `url(${user.photoURL})`;
             }
-        } catch (e) { console.error("Firebase Error"); }
+        }
 
+        // --- API & AI Helper ---
         async function apiFetch(url, body) {
-            if (!MY_GEMINI_KEY) throw new Error("Key missing");
+            if (!MY_GEMINI_KEY) throw new Error("APIキー未設定やで");
             const resp = await fetch(url + `?key=${MY_GEMINI_KEY}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
             });
+            if (!resp.ok) throw new Error("API通信エラー");
             return await resp.json();
         }
 
+        async function askSakuraAI(prompt) {
+            if (isAIThinking || !MY_GEMINI_KEY) return;
+            isAIThinking = true;
+            try {
+                const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
+                    contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] }
+                });
+                const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (txt) speakText(txt);
+            } catch (err) { speakText("ごめん、ちょっと調子悪いわ！"); }
+            finally { isAIThinking = false; }
+        }
+
+        async function speakText(txt) {
+            const bubble = document.getElementById('ai-chat-bubble');
+            const resp = document.getElementById('ai-response-text');
+            if (resp) resp.textContent = txt;
+            if (bubble) bubble.style.display = 'block';
+            
+            if (!MY_GEMINI_KEY) { 
+                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
+                speechSynthesis.speak(u); return; 
+            }
+            try {
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, {
+                    contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
+                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
+                });
+                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (pcm) playAudio(pcm);
+            } catch(e) { 
+                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume; speechSynthesis.speak(u); 
+            }
+        }
+
+        function playAudio(base64) {
+            const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
+            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
+            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
+            const blob = new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' });
+            const audio = new Audio(URL.createObjectURL(blob));
+            audio.volume = voiceVolume; audio.play();
+        }
+
+        // --- Geolocation & Address ---
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
             lastAddressFetchTime = Date.now();
@@ -170,31 +313,9 @@
             } catch (e) {}
         }
 
-        async function generateSakuraIcon() {
-            if (!MY_GEMINI_KEY) return;
-            try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`, {
-                    instances: { prompt: "Cute Japanese anime school girl character icon, long black hair, cherry blossom pin, circle style." }, parameters: { sampleCount: 1 }
-                });
-                const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-                if (b64) {
-                    document.getElementById('ai-image').src = `data:image/png;base64,${b64}`;
-                    document.getElementById('ai-image').classList.remove('hidden');
-                    document.getElementById('ai-loading-icon').classList.add('hidden');
-                }
-            } catch (e) {}
-        }
-
-        function switchView(id) {
-            document.querySelectorAll('.view-screen').forEach(v => v.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            if (id === 'map-overlay' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); }, 200);
-            lucide.createIcons();
-        }
-
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
-            lastSuccessTimestamp = Date.now(); currentPos = [lat, lng];
+            currentPos = [lat, lng];
             updateAddress(lat, lng);
             if (marker) marker.setLatLng(currentPos);
             document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
@@ -215,78 +336,113 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        async function speakText(txt) {
-            document.getElementById('ai-response-text').textContent = txt;
-            document.getElementById('ai-chat-bubble').style.display = 'block';
-            if (!MY_GEMINI_KEY) { const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume; speechSynthesis.speak(u); return; }
-            try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, {
-                    contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
-                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } } }
-                });
-                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (pcm) {
-                    const bin = atob(pcm), len = bin.length, bytes = new Uint8Array(len);
-                    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
-                    const hdr = new ArrayBuffer(44), v = new DataView(hdr);
-                    v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + len, true); v.setUint32(8, 0x57415645, false);
-                    v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
-                    v.setUint16(22, 1, true); v.setUint32(24, 24000, true); v.setUint32(28, 48000, true);
-                    v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, len, true);
-                    const audio = new Audio(URL.createObjectURL(new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' })));
-                    audio.volume = voiceVolume; audio.play();
+        // --- UI Switcher (Fix for blank screen) ---
+        function switchView(id) {
+            // All screens hide
+            document.querySelectorAll('.view-screen').forEach(v => {
+                v.classList.remove('active');
+            });
+            // Show target
+            const target = document.getElementById(id);
+            if (target) {
+                target.classList.add('active');
+                if (id === 'map-overlay' && map) {
+                    setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); }, 200);
                 }
-            } catch(e) { const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume; speechSynthesis.speak(u); }
+                lucide.createIcons();
+            }
         }
 
-        async function askSakuraAI(prompt) {
-            if (isAIThinking || !MY_GEMINI_KEY) return;
-            isAIThinking = true;
-            try {
-                const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
-                    contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: sys }] }
-                });
-                const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (txt) speakText(txt);
-            } catch (err) { speakText("エラーやわ！"); }
-            finally { isAIThinking = false; }
-        }
-
+        // --- Main Init ---
         document.addEventListener('DOMContentLoaded', () => {
-            const status = document.getElementById('status-text');
-            if(MY_FIREBASE_CONFIG) status.textContent = "Firebase設定済み！";
-            else status.textContent = "Firebase設定待ち...";
+            initFirebase();
+            
+            // Interaction: View Switching
+            document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
+            document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
+            document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
+            document.getElementById('close-map-btn').onclick = () => switchView('main-view');
 
-            document.getElementById('mode-walking').onclick = () => { currentMode = 'walking'; document.getElementById('nav-hud').style.display = 'none'; };
-            document.getElementById('mode-driving').onclick = () => { currentMode = 'driving'; document.getElementById('nav-hud').style.display = 'flex'; };
+            // Interaction: Modes
+            document.getElementById('mode-walking').onclick = () => { 
+                currentMode = 'walking'; 
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('mode-walking').classList.add('active');
+                document.getElementById('nav-hud').style.display = 'none'; 
+            };
+            document.getElementById('mode-driving').onclick = () => { 
+                currentMode = 'driving'; 
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('mode-driving').classList.add('active');
+                document.getElementById('nav-hud').style.display = 'flex'; 
+            };
+            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
+
+            // Interaction: Recording
             document.getElementById('record-toggle-btn').onclick = () => {
                 isTracking = !isTracking;
                 const btn = document.getElementById('record-toggle-btn');
-                if(isTracking) { startTime = Date.now(); totalDistance = 0; historyPoints = []; speakText("記録開始！"); btn.classList.replace('bg-green-500', 'bg-red-500'); }
-                else { speakText("止めたで！お疲れ様。"); btn.classList.replace('bg-red-500', 'bg-green-500'); }
+                const text = document.getElementById('btn-text');
+                const icon = document.getElementById('btn-icon');
+                if (isTracking) {
+                    startTime = Date.now(); totalDistance = 0; historyPoints = []; 
+                    if (polyline) polyline.setLatLngs([]);
+                    speakText("記録開始！しっかりついていくで！");
+                    btn.classList.replace('bg-green-500', 'bg-red-500');
+                    text.textContent = "記録停止";
+                    lucide.createIcons();
+                } else {
+                    speakText("お疲れ様！記録を止めたわ。");
+                    btn.classList.replace('bg-red-500', 'bg-green-500');
+                    text.textContent = "記録開始";
+                    lucide.createIcons();
+                }
             };
+
+            // Interaction: Google Login
             document.getElementById('google-login-btn').onclick = async () => {
-                if(!auth) { alert("Firebaseの設定をしてな！"); return; }
-                try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch(e) { console.error(e); }
+                if (!auth) { alert("Firebaseの設定を先にやってな！"); return; }
+                const provider = new GoogleAuthProvider();
+                try {
+                    // Use Popup but ensure domain is authorized in Firebase
+                    await signInWithPopup(auth, provider);
+                } catch (e) {
+                    console.error("Login Error", e);
+                    alert("ログイン失敗したわ。設定ドメインを確認してみてな。");
+                }
             };
-            document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
-            document.getElementById('close-settings-btn').onclick = () => switchView('main');
-            document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
-            document.getElementById('close-map-btn').onclick = () => switchView('main');
-            const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (sr) {
-                const rec = new sr(); rec.lang = 'ja-JP'; rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
+
+            // Interaction: Mic (Gemini AI)
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                const rec = new SpeechRecognition();
+                rec.lang = 'ja-JP';
+                rec.onstart = () => { document.getElementById('ai-mic-btn').classList.add('recording'); };
+                rec.onend = () => { document.getElementById('ai-mic-btn').classList.remove('recording'); };
+                rec.onresult = (e) => { 
+                    const prompt = e.results[0][0].transcript;
+                    askSakuraAI(prompt);
+                };
                 document.getElementById('ai-mic-btn').onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
             }
+
+            // Map Init
             try {
                 map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map);
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
             } catch(e) {}
-            if ("geolocation" in navigator) navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
-            generateSakuraIcon(); lucide.createIcons();
+
+            // Geolocation Start
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
+            }
+
+            document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
+            document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
+            
+            lucide.createIcons();
         });
     </script>
 </body>
