@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.5 (API Model Fixed)</title>
+    <title>GPS Tracker Pro v17.6 (Fixed Icon Edition)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -28,14 +28,16 @@
         
         /* AIキャラクターコンテナ */
         #ai-container { 
-            position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 260px; 
-            display: flex; align-items: flex-end; gap: 10px; z-index: 80; 
+            position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 280px; 
+            display: flex; align-items: flex-end; gap: 12px; z-index: 80; 
             pointer-events: none; transition: all 0.3s ease; 
         }
+        
+        /* ★修正ポイント：flex-shrink: 0; で絶対に潰れないようにしたで！ */
         #ai-avatar { 
             width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; 
-            overflow: hidden; shrink-0; pointer-events: auto; cursor: pointer;
+            overflow: hidden; flex-shrink: 0; pointer-events: auto; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
         }
         #ai-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -53,8 +55,6 @@
         
         .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 12px 20px; border-radius: 12px; z-index: 9999; display: none; font-size: 13px; width: 85%; max-width: 400px; text-align: center; line-height: 1.4; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
         
-        .ai-pulse { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
         .recording { border: 4px solid #ec4899 !important; background-color: #fce7f3 !important; box-shadow: 0 0 20px rgba(236, 72, 153, 0.5) !important; }
     </style>
 </head>
@@ -63,7 +63,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.5</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.6</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -116,9 +116,9 @@
 
     <!-- AIキャラクターインターフェース -->
     <div id="ai-container">
-        <div id="ai-avatar" class="ai-pulse">
-            <div id="ai-loading-icon" class="text-pink-300"><i data-lucide="sparkles" class="w-8 h-8 animate-spin"></i></div>
-            <img id="ai-image" class="hidden" alt="さくら">
+        <!-- ★GitHubに上げた画像を直接読み込むように変更したで！ -->
+        <div id="ai-avatar">
+            <img id="ai-image" src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/64/fdf2f8/ec4899?text=Sakura'">
         </div>
         <div id="ai-chat-bubble">
             <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
@@ -168,14 +168,6 @@
                 </button>
             </div>
 
-            <!-- さくらの見た目 -->
-            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">さくらの見た目</h3>
-                <button id="regenerate-icon-btn" class="w-full bg-pink-50 text-pink-600 py-3 rounded-xl text-xs font-bold active:bg-pink-100 transition-colors">
-                    <i data-lucide="palette" class="inline w-3 h-3 mr-1"></i> さくらのイラストを描き直す
-                </button>
-            </div>
-
             <!-- 音声設定 -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス設定</h3>
@@ -206,7 +198,6 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Gemini APIキー (初期値は空、ブラウザに保存します)
         let MY_GEMINI_KEY = ""; 
 
         // Firebaseの設定を固定化
@@ -219,7 +210,6 @@
           appId: "1:12221954272:web:31dd55c3b572c813577885"
         };
 
-        // グローバル変数
         let user = null, auth = null, db = null, map = null, marker = null, polyline = null, currentPos = null;
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
@@ -234,7 +224,6 @@
             return getStoredKey() || MY_GEMINI_KEY.trim();
         }
 
-        // Firebase初期化
         function initFirebase() {
             try {
                 if (MY_FIREBASE_CONFIG) {
@@ -261,7 +250,6 @@
             }
         }
 
-        // 汎用APIフェッチ関数 (エラー表示時間を延長)
         async function apiFetch(url, body, retries = 3) {
             const key = getEffectiveKey();
             if (!key) throw new Error("APIキーが未設定です。設定画面から保存してな！");
@@ -293,7 +281,6 @@
             }
         }
 
-        // AI問い合わせ (正式版モデルに修正！)
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             
@@ -309,8 +296,6 @@
             isAIThinking = true;
             try {
                 const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
-                
-                // ★修正箇所: 正式版の gemini-2.5-flash または gemini-1.5-flash を使用
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
                 
                 const data = await apiFetch(url, {
@@ -328,49 +313,16 @@
             }
         }
 
-        // 音声合成 (標準ブラウザTTSへフォールバックを強化)
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
             if (resp) resp.textContent = txt;
             if (bubble) bubble.style.display = 'block';
             
-            const key = getEffectiveKey();
-            // Google CloudのTTSはプレビュー機能なため、外部APIキーでは弾かれやすいので
-            // 標準のブラウザ音声合成(SpeechSynthesis)を確実に使うようにします
             const u = new SpeechSynthesisUtterance(txt); 
             u.lang = 'ja-JP'; 
             u.volume = voiceVolume;
             speechSynthesis.speak(u); 
-        }
-
-        // キャラクター生成 (正式版モデルの可能性を探るか、フォールバック)
-        async function generateSakuraIcon() {
-            const key = getEffectiveKey();
-            if (!key) return;
-            const loader = document.getElementById('ai-loading-icon');
-            const img = document.getElementById('ai-image');
-            if (loader) loader.classList.remove('hidden');
-            if (img) img.classList.add('hidden');
-            
-            try {
-                // 画像生成も外部環境で安定しやすいプロンプトと設定
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`;
-                const prompt = "A cute, energetic Japanese anime girl, middle school student, long black hair with a cherry blossom hair clip, bright brown eyes, stylish pink hoodie, smiling warmly, high quality, circular profile picture style.";
-                const data = await apiFetch(url, { instances: { prompt }, parameters: { sampleCount: 1 } });
-                const b64 = data.predictions?.[0]?.bytesBase64Encoded;
-                if (b64) {
-                    if (img) { 
-                        img.src = `data:image/png;base64,${b64}`; 
-                        img.onload = () => { img.classList.remove('hidden'); if (loader) loader.classList.add('hidden'); };
-                    }
-                    showToast("新しいさくらを描いたで！");
-                }
-            } catch (e) { 
-                if (loader) loader.classList.add('hidden');
-                showToast(`画像エラー: ${e.message}`, true);
-                document.getElementById('ai-loading-icon').classList.remove('hidden');
-            }
         }
 
         async function updateAddress(lat, lng) {
@@ -420,7 +372,6 @@
             }
         }
 
-        // トースト通知 (表示時間を10秒に変更)
         function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             if (t) { 
@@ -462,7 +413,6 @@
                     localStorage.setItem('GEMINI_API_KEY', newKey);
                     showToast("キーを保存したで！次から入力いらへんよ。");
                     updateKeyUI();
-                    generateSakuraIcon();
                 } else {
                     localStorage.removeItem('GEMINI_API_KEY');
                     showToast("キーを削除したで。");
@@ -522,9 +472,7 @@
 
             document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
             document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
-            document.getElementById('regenerate-icon-btn').onclick = () => generateSakuraIcon();
             
-            generateSakuraIcon();
             lucide.createIcons();
         });
     </script>
