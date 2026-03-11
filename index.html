@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v16.6 (Tab & Login Fixed)</title>
+    <title>GPS Tracker Pro v16.7 (Mic & Icon Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -55,7 +55,7 @@
         
         .ai-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        .recording { border: 3px solid #ec4899 !important; background-color: #fce7f3 !important; }
+        .recording { border: 4px solid #ec4899 !important; background-color: #fce7f3 !important; box-shadow: 0 0 20px rgba(236, 72, 153, 0.5) !important; }
     </style>
 </head>
 <body class="font-sans text-gray-800">
@@ -63,7 +63,7 @@
     <!-- --- MAIN VIEW --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.6</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v16.7</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -117,12 +117,12 @@
     <!-- AI Interface -->
     <div id="ai-container">
         <div id="ai-avatar" class="ai-pulse">
-            <div id="ai-loading-icon" class="text-pink-300"><i data-lucide="smile" class="w-8 h-8"></i></div>
+            <div id="ai-loading-icon" class="text-pink-300"><i data-lucide="sparkles" class="w-8 h-8 animate-spin"></i></div>
             <img id="ai-image" class="hidden" alt="さくら">
         </div>
         <div id="ai-chat-bubble">
             <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
-            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">なんや、御用かな？</p>
+            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">呼んだ？なんや、なんでも聞いてな！</p>
         </div>
     </div>
 
@@ -149,7 +149,7 @@
                         <p id="user-email" class="text-xs text-gray-400"></p>
                     </div>
                 </div>
-                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:bg-gray-50">
+                <button id="google-login-btn" class="w-full bg-white border-2 border-gray-100 py-3 rounded-xl font-bold flex items-center justify-center gap-2 active:bg-gray-50 transition-colors">
                     <i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン
                 </button>
             </div>
@@ -157,12 +157,17 @@
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
                 <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">設定状態</h3>
                 <div id="status-text" class="text-xs font-bold text-red-400">Firebase 設定待ち...</div>
-                <p class="text-[10px] text-gray-400 mt-2">※ログインできない場合は設定値を確認してな！</p>
+                <button id="regenerate-icon-btn" class="mt-4 w-full bg-pink-50 text-pink-600 py-3 rounded-xl text-xs font-bold active:bg-pink-100 transition-colors">
+                    <i data-lucide="palette" class="inline w-3 h-3 mr-1"></i> さくらのイラストを描き直す
+                </button>
             </div>
             <!-- Voice -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス</h3>
-                <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-full accent-pink-500">
+                <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス設定</h3>
+                <div class="flex items-center gap-4">
+                    <i data-lucide="volume-2" class="w-4 h-4 text-gray-400"></i>
+                    <input type="range" id="volume-slider" min="0" max="100" value="80" class="w-full accent-pink-500">
+                </div>
             </div>
         </div>
     </div>
@@ -221,8 +226,11 @@
                         user = u;
                         updateAuthUI();
                     });
-                    document.getElementById('status-text').textContent = "Firebase 設定済み！";
-                    document.getElementById('status-text').className = "text-xs font-bold text-green-500";
+                    const statusEl = document.getElementById('status-text');
+                    if (statusEl) {
+                        statusEl.textContent = "Firebase 設定済み！";
+                        statusEl.className = "text-xs font-bold text-green-500";
+                    }
                 }
             } catch (e) { console.error("Firebase Auth Init Failed", e); }
         }
@@ -252,6 +260,7 @@
         async function askSakuraAI(prompt) {
             if (isAIThinking || !MY_GEMINI_KEY) return;
             isAIThinking = true;
+            showToast("さくらに相談中...");
             try {
                 const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。3行以内で返答してな。`;
                 const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, {
@@ -259,8 +268,11 @@
                 });
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) speakText(txt);
-            } catch (err) { speakText("ごめん、ちょっと調子悪いわ！"); }
-            finally { isAIThinking = false; }
+            } catch (err) { 
+                speakText("ごめん、ちょっと調子悪いわ！通信環境を確認してな。"); 
+            } finally { 
+                isAIThinking = false; 
+            }
         }
 
         async function speakText(txt) {
@@ -298,6 +310,29 @@
             audio.volume = voiceVolume; audio.play();
         }
 
+        async function generateSakuraIcon() {
+            if (!MY_GEMINI_KEY) return;
+            const loader = document.getElementById('ai-loading-icon');
+            const img = document.getElementById('ai-image');
+            if (loader) loader.classList.remove('hidden');
+            if (img) img.classList.add('hidden');
+            
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict`;
+                const prompt = "A cute, energetic Japanese anime girl, middle school student age, long black hair with a cherry blossom hair clip, bright brown eyes, wearing a stylish pink hoodie, smiling warmly, high quality, vibrant colors, circular profile picture style, white background.";
+                const data = await apiFetch(url, { instances: { prompt }, parameters: { sampleCount: 1 } });
+                const b64 = data.predictions?.[0]?.bytesBase64Encoded;
+                if (b64) {
+                    if (img) { img.src = `data:image/png;base64,${b64}`; img.classList.remove('hidden'); }
+                    if (loader) loader.classList.add('hidden');
+                    showToast("新しいさくらを描いたで！");
+                }
+            } catch (e) { 
+                console.warn("Icon gen failed."); 
+                if (loader) loader.classList.add('hidden');
+            }
+        }
+
         // --- Geolocation & Address ---
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
@@ -308,7 +343,8 @@
                 if (data && data.address) {
                     const a = data.address;
                     lastAddress = [a.province || a.state, a.city || a.town || a.village].filter(Boolean).join(' ') || "不明な場所";
-                    document.getElementById('address-display').textContent = lastAddress;
+                    const addrEl = document.getElementById('address-display');
+                    if (addrEl) addrEl.textContent = lastAddress;
                 }
             } catch (e) {}
         }
@@ -318,15 +354,18 @@
             currentPos = [lat, lng];
             updateAddress(lat, lng);
             if (marker) marker.setLatLng(currentPos);
-            document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
+            const locEl = document.getElementById('location-display');
+            if (locEl) locEl.textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
             if (isTracking) {
                 if (historyPoints.length > 0) {
                     const last = historyPoints[historyPoints.length - 1];
                     const dist = getDistance(last.lat, last.lng, lat, lng);
                     if (dist > 3) { totalDistance += dist; historyPoints.push({ lat, lng, time: Date.now() }); if (polyline) polyline.addLatLng(currentPos); }
                 } else { historyPoints.push({ lat, lng, time: Date.now() }); if (polyline) polyline.addLatLng(currentPos); }
-                document.getElementById('dist-display').textContent = (totalDistance / 1000).toFixed(2);
-                document.getElementById('speed-display').textContent = speed ? (speed * 3.6).toFixed(1) : "0.0";
+                const distEl = document.getElementById('dist-display');
+                const speedEl = document.getElementById('speed-display');
+                if (distEl) distEl.textContent = (totalDistance / 1000).toFixed(2);
+                if (speedEl) speedEl.textContent = speed ? (speed * 3.6).toFixed(1) : "0.0";
             }
         }
 
@@ -338,11 +377,9 @@
 
         // --- UI Switcher (Fix for blank screen) ---
         function switchView(id) {
-            // All screens hide
             document.querySelectorAll('.view-screen').forEach(v => {
                 v.classList.remove('active');
             });
-            // Show target
             const target = document.getElementById(id);
             if (target) {
                 target.classList.add('active');
@@ -353,58 +390,72 @@
             }
         }
 
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+        }
+
         // --- Main Init ---
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
             
             // Interaction: View Switching
-            document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
-            document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
-            document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
-            document.getElementById('close-map-btn').onclick = () => switchView('main-view');
+            const openSettings = document.getElementById('open-settings-btn');
+            const closeSettings = document.getElementById('close-settings-btn');
+            const openMap = document.getElementById('open-map-btn');
+            const closeMap = document.getElementById('close-map-btn');
+
+            if(openSettings) openSettings.onclick = () => switchView('settings-view');
+            if(closeSettings) closeSettings.onclick = () => switchView('main-view');
+            if(openMap) openMap.onclick = () => switchView('map-overlay');
+            if(closeMap) closeMap.onclick = () => switchView('main-view');
 
             // Interaction: Modes
-            document.getElementById('mode-walking').onclick = () => { 
+            const walkBtn = document.getElementById('mode-walking');
+            const driveBtn = document.getElementById('mode-driving');
+            const navHud = document.getElementById('nav-hud');
+
+            if(walkBtn) walkBtn.onclick = () => { 
                 currentMode = 'walking'; 
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                document.getElementById('mode-walking').classList.add('active');
-                document.getElementById('nav-hud').style.display = 'none'; 
+                walkBtn.classList.add('active');
+                if(navHud) navHud.style.display = 'none'; 
             };
-            document.getElementById('mode-driving').onclick = () => { 
+            if(driveBtn) driveBtn.onclick = () => { 
                 currentMode = 'driving'; 
                 document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                document.getElementById('mode-driving').classList.add('active');
-                document.getElementById('nav-hud').style.display = 'flex'; 
+                driveBtn.classList.add('active');
+                if(navHud) navHud.style.display = 'flex'; 
             };
-            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
+            const stopNav = document.getElementById('stop-nav-btn');
+            if(stopNav) stopNav.onclick = () => { if(navHud) navHud.style.display = 'none'; };
 
             // Interaction: Recording
-            document.getElementById('record-toggle-btn').onclick = () => {
+            const recordBtn = document.getElementById('record-toggle-btn');
+            if(recordBtn) recordBtn.onclick = () => {
                 isTracking = !isTracking;
-                const btn = document.getElementById('record-toggle-btn');
                 const text = document.getElementById('btn-text');
                 const icon = document.getElementById('btn-icon');
                 if (isTracking) {
                     startTime = Date.now(); totalDistance = 0; historyPoints = []; 
                     if (polyline) polyline.setLatLngs([]);
                     speakText("記録開始！しっかりついていくで！");
-                    btn.classList.replace('bg-green-500', 'bg-red-500');
-                    text.textContent = "記録停止";
-                    lucide.createIcons();
+                    recordBtn.classList.replace('bg-green-500', 'bg-red-500');
+                    if(text) text.textContent = "記録停止";
                 } else {
                     speakText("お疲れ様！記録を止めたわ。");
-                    btn.classList.replace('bg-red-500', 'bg-green-500');
-                    text.textContent = "記録開始";
-                    lucide.createIcons();
+                    recordBtn.classList.replace('bg-red-500', 'bg-green-500');
+                    if(text) text.textContent = "記録開始";
                 }
+                lucide.createIcons();
             };
 
             // Interaction: Google Login
-            document.getElementById('google-login-btn').onclick = async () => {
+            const googleBtn = document.getElementById('google-login-btn');
+            if(googleBtn) googleBtn.onclick = async () => {
                 if (!auth) { alert("Firebaseの設定を先にやってな！"); return; }
                 const provider = new GoogleAuthProvider();
                 try {
-                    // Use Popup but ensure domain is authorized in Firebase
                     await signInWithPopup(auth, provider);
                 } catch (e) {
                     console.error("Login Error", e);
@@ -413,17 +464,18 @@
             };
 
             // Interaction: Mic (Gemini AI)
+            const micBtn = document.getElementById('ai-mic-btn');
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (SpeechRecognition) {
+            if (SpeechRecognition && micBtn) {
                 const rec = new SpeechRecognition();
                 rec.lang = 'ja-JP';
-                rec.onstart = () => { document.getElementById('ai-mic-btn').classList.add('recording'); };
-                rec.onend = () => { document.getElementById('ai-mic-btn').classList.remove('recording'); };
+                rec.onstart = () => { micBtn.classList.add('recording'); showToast("喋ってな！"); };
+                rec.onend = () => { micBtn.classList.remove('recording'); };
                 rec.onresult = (e) => { 
                     const prompt = e.results[0][0].transcript;
                     askSakuraAI(prompt);
                 };
-                document.getElementById('ai-mic-btn').onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
+                micBtn.onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
             }
 
             // Map Init
@@ -439,9 +491,16 @@
                 navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
             }
 
-            document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
-            document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
+            const centerBtn = document.getElementById('center-btn');
+            if(centerBtn) centerBtn.onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
             
+            const volSlider = document.getElementById('volume-slider');
+            if(volSlider) volSlider.oninput = (e) => { voiceVolume = e.target.value / 100; };
+            
+            const regenIconBtn = document.getElementById('regenerate-icon-btn');
+            if(regenIconBtn) regenIconBtn.onclick = () => generateSakuraIcon();
+            
+            generateSakuraIcon();
             lucide.createIcons();
         });
     </script>
