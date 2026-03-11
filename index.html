@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.13 (iOS Mic Fix)</title>
+    <title>GPS Tracker Pro v17.14 (Error Handling Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -65,7 +65,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.13</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.14</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                     <i data-lucide="list"></i>
@@ -298,6 +298,7 @@
             }
         }
 
+        // ★修正ポイント：APIエラーの解析を賢くして、赤いエラー画面を出させない
         async function apiFetch(url, body, retries = 3) {
             const key = getEffectiveKey();
             if (!key) throw new Error("APIキーが未設定です。設定画面から保存してな！");
@@ -307,14 +308,24 @@
                     const resp = await fetch(`${url}?key=${key}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
                     });
+                    
                     if (!resp.ok) {
                         let errDetail = "";
                         try { errDetail = (await resp.json()).error?.message || '不明なエラー'; } catch(e) { errDetail = `Status: ${resp.status}`; }
+                        
+                        // Quota超過（喋りすぎ制限）の場合は特別扱いで即座に投げる
+                        if (resp.status === 429 || errDetail.includes("quota") || errDetail.includes("exceeded")) {
+                            throw new Error("QUOTA_EXCEEDED");
+                        }
+                        
                         throw new Error(`[API Error] ${errDetail}`);
                     }
                     return await resp.json();
                 } catch (err) {
-                    if (i === retries - 1 || err.message.includes("無効化") || err.message.includes("未設定")) throw err;
+                    // Quotaエラーならリトライせずに諦める（待ってもらうしかないから）
+                    if (err.message === "QUOTA_EXCEEDED" || i === retries - 1 || err.message.includes("無効化") || err.message.includes("未設定")) {
+                        throw err;
+                    }
                     await new Promise(r => setTimeout(r, delay));
                     delay *= 2;
                 }
@@ -362,8 +373,15 @@
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
                 chatHistory.pop();
-                showToast(`会話エラー: ${err.message}`, true); 
-                speakText("ごめんゆーみん、ちょっと電波が悪いみたいやわ。"); 
+                
+                // ★修正ポイント：Quotaエラーの時は優しく教える！
+                if (err.message === "QUOTA_EXCEEDED") {
+                    showToast("ごめん！喋りすぎて息切れしてもた！10秒くらい待ってな！", true); 
+                    fallbackTTS("ごめんゆーみん、ちょっと息切れしてもたわ。ちょっと待ってからもう一回話しかけてな！");
+                } else {
+                    showToast(`通信エラーやわ。もう一回試してみて！`, true); 
+                    fallbackTTS("ごめんゆーみん、ちょっと電波が悪いみたいやわ。"); 
+                }
             } finally { 
                 isAIThinking = false; 
             }
@@ -396,6 +414,7 @@
                     }
                 } catch(e) {
                     console.error("TTS Error:", e);
+                    // ここでもエラーが出たら諦めて標準音声に切り替える
                 }
             }
             fallbackTTS(txt);
@@ -646,6 +665,7 @@
 
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
+                unlockAudio(); 
                 isTracking = !isTracking;
                 const text = document.getElementById('btn-text');
                 if (isTracking) {
@@ -670,16 +690,14 @@
                 try { await signInWithPopup(auth, provider); } catch (e) { alert("失敗: " + e.message); }
             };
 
-            // ★修正ポイント：iPhoneのマイク専用チューニング！
             const micBtn = document.getElementById('ai-mic-btn');
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr && micBtn) {
                 const rec = new sr();
                 rec.lang = 'ja-JP';
-                rec.continuous = false; // 1回喋り終わったらスパッと切る
+                rec.continuous = false; 
                 rec.interimResults = false;
 
-                // マイクが青く光って、完全に準備完了した時の合図
                 rec.onstart = () => { 
                     micBtn.classList.add('recording'); 
                     showToast("🎙️ ピコン！今や、喋ってな！"); 
@@ -689,7 +707,6 @@
                     micBtn.classList.remove('recording'); 
                 };
 
-                // もしうまく起動できんかった時のエラー表示
                 rec.onerror = (e) => { 
                     micBtn.classList.remove('recording'); 
                     console.error("Speech error:", e.error);
@@ -706,12 +723,11 @@
                 };
 
                 micBtn.onclick = (e) => { 
-                    e.stopPropagation(); // ダミー音のロック解除処理と同時に動くのを防ぐ！
+                    e.stopPropagation(); 
                     showToast("⏳ マイク準備中…（iPhoneはちょっと待ってな！）");
                     try { 
                         rec.start(); 
                     } catch(err) { 
-                        // すでに動いてる等のエラーが出た時は、一度止めてからやり直す
                         rec.stop(); 
                         setTimeout(() => rec.start(), 300);
                     } 
