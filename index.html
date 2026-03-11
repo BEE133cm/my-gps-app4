@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.1 (Security Fix)</title>
+    <title>GPS Tracker Pro v17.2 (Secure Key Storage)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -63,7 +63,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.1</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.2</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -139,6 +139,20 @@
             <div class="w-8"></div>
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
+            
+            <!-- Gemini API設定 (これが今回のメイン！) -->
+            <div class="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm flex flex-col gap-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-bold text-pink-500 uppercase tracking-widest">Gemini AI キー設定</h3>
+                    <div id="key-badge" class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">未設定</div>
+                </div>
+                <p class="text-[10px] text-gray-400 leading-tight">GitHubでの漏洩を防ぐため、キーはブラウザに保存します。友達にテストしてもらう時は、キーを直接渡してここに貼ってもらってな！</p>
+                <div class="flex flex-col gap-2">
+                    <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300 transition-all">
+                    <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存する</button>
+                </div>
+            </div>
+
             <!-- アカウント -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント</h3>
@@ -153,14 +167,15 @@
                     <i data-lucide="log-in" class="w-4 h-4"></i> Googleログイン
                 </button>
             </div>
-            <!-- API状態 -->
+
+            <!-- さくらの見た目 -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 class="text-xs font-bold text-gray-400 uppercase mb-2">設定状態</h3>
-                <div id="status-text" class="text-xs font-bold text-red-400">APIキーを入力してください</div>
-                <button id="regenerate-icon-btn" class="mt-4 w-full bg-pink-50 text-pink-600 py-3 rounded-xl text-xs font-bold active:bg-pink-100 transition-colors">
+                <h3 class="text-xs font-bold text-gray-400 uppercase mb-4">さくらの見た目</h3>
+                <button id="regenerate-icon-btn" class="w-full bg-pink-50 text-pink-600 py-3 rounded-xl text-xs font-bold active:bg-pink-100 transition-colors">
                     <i data-lucide="palette" class="inline w-3 h-3 mr-1"></i> さくらのイラストを描き直す
                 </button>
             </div>
+
             <!-- 音声設定 -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase">さくらボイス設定</h3>
@@ -192,10 +207,10 @@
         import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // 【重要】新しいAPIキーをここに貼り付けてな！
-        // 漏洩したキーは無効化されているので、必ず新しく作成してください。
+        // 【v17.2 セキュリティ対策】
+        // コードにはキーを書き込みません。設定画面から保存してください。
         // ==========================================
-        let MY_GEMINI_KEY = "AIzaSyA4EzoJ-SYbsM76I7kUiSoQY4m_vUBPdwQ"; 
+        let MY_GEMINI_KEY = ""; 
 
         // ==========================================
         // 【2】Firebaseの設定（Config）
@@ -215,10 +230,14 @@
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
 
-        // APIキーの取得
+        // ブラウザに保存されたキーを取得
+        function getStoredKey() {
+            const saved = localStorage.getItem('GEMINI_API_KEY');
+            return saved ? saved.trim() : "";
+        }
+
         function getEffectiveKey() {
-            const raw = MY_GEMINI_KEY || "";
-            return raw.trim();
+            return getStoredKey() || MY_GEMINI_KEY.trim();
         }
 
         // Firebase初期化
@@ -233,11 +252,6 @@
                         user = u;
                         updateAuthUI();
                     });
-                    const statusEl = document.getElementById('status-text');
-                    if (statusEl) {
-                        statusEl.textContent = "Firebase 設定済み！";
-                        statusEl.className = "text-xs font-bold text-green-500";
-                    }
                 }
             } catch (e) { console.error("Firebase Auth Init Failed", e); }
         }
@@ -257,7 +271,7 @@
         // 汎用APIフェッチ関数
         async function apiFetch(url, body, retries = 3) {
             const key = getEffectiveKey();
-            if (!key) throw new Error("APIキーが設定されてへんわ！");
+            if (!key) throw new Error("APIキーが設定されてへんわ！設定画面から入力してな。");
 
             let delay = 1000;
             for (let i = 0; i < retries; i++) {
@@ -270,29 +284,27 @@
                     if (!resp.ok) {
                         const errData = await resp.json().catch(() => ({}));
                         const message = errData.error?.message || '不明なエラー';
-                        
-                        // キーの漏洩エラーに対する特別な処理
                         if (resp.status === 403 && message.includes("leaked")) {
-                            throw new Error("このAPIキーは漏洩として無効化されてるわ。新しいキーを発行して貼り直してな！");
+                            throw new Error("このキーは漏洩としてGoogleに止められてるみたいや。新しいキーを発行し直してな。");
                         }
-                        
                         throw new Error(`Status: ${resp.status} - ${message}`);
                     }
                     return await resp.json();
                 } catch (err) {
-                    if (i === retries - 1 || err.message.includes("新しいキーを発行")) throw err;
+                    if (i === retries - 1 || err.message.includes("キーを新しく")) throw err;
                     await new Promise(r => setTimeout(r, delay));
                     delay *= 2;
                 }
             }
         }
 
-        // さくらAIへの問い合わせ
+        // AI問い合わせ
         async function askSakuraAI(prompt) {
             if (isAIThinking) return;
             const key = getEffectiveKey();
             if (!key) {
-                speakText("APIキーが設定されてへんから、お喋りできへんねん。設定画面からキーを入力してな！");
+                speakText("設定画面からAPIキーを入力してくれたら、お喋りできるようになるで！");
+                switchView('settings-view');
                 return;
             }
 
@@ -308,15 +320,14 @@
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) speakText(txt);
             } catch (err) { 
-                console.error("Sakura AI Error:", err);
                 showToast(`エラー: ${err.message}`);
-                speakText("ごめん、ちょっと調子悪いわ！" + (err.message.includes("無効化") ? "キーを新しくしなあかんみたいや。" : "ネットを確認してな。")); 
+                speakText("ごめん、ちょっと調子悪いわ！キーの設定かネットを確認してな。"); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
-        // 音声合成と表示
+        // 音声合成
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -341,7 +352,6 @@
             }
         }
 
-        // 音声再生
         function playAudio(base64) {
             const bin = atob(base64), len = bin.length, bytes = new Uint8Array(len);
             for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
@@ -355,7 +365,7 @@
             audio.volume = voiceVolume; audio.play();
         }
 
-        // キャラクター画像生成
+        // イラスト生成
         async function generateSakuraIcon() {
             const key = getEffectiveKey();
             if (!key) return;
@@ -381,15 +391,13 @@
                     showToast("新しいさくらを描いたで！");
                 }
             } catch (e) { 
-                console.error("Icon Gen Error:", e);
-                showToast(`${e.message}`);
                 if (loader) loader.classList.add('hidden');
                 const loaderIcon = document.getElementById('ai-loading-icon');
                 if (loaderIcon) loaderIcon.classList.remove('hidden');
             }
         }
 
-        // 住所取得（リバースジオコーディング）
+        // 住所取得
         async function updateAddress(lat, lng) {
             if (Date.now() - lastAddressFetchTime < 30000) return;
             lastAddressFetchTime = Date.now();
@@ -405,7 +413,6 @@
             } catch (e) {}
         }
 
-        // 位置情報の更新
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
             currentPos = [lat, lng];
@@ -426,14 +433,12 @@
             }
         }
 
-        // 2点間の距離計算 (Haversine公式)
         function getDistance(la1, lo1, la2, lo2) {
             const R = 6371000, dLa = (la2 - la1) * Math.PI / 180, dLo = (lo2 - lo1) * Math.PI / 180;
             const a = Math.sin(dLa/2)**2 + Math.cos(la1 * Math.PI/180) * Math.cos(la2 * Math.PI/180) * Math.sin(dLo/2)**2;
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // 画面切り替え
         function switchView(id) {
             document.querySelectorAll('.view-screen').forEach(v => v.classList.remove('active'));
             const target = document.getElementById(id);
@@ -446,21 +451,51 @@
             }
         }
 
-        // トースト通知
         function showToast(msg) {
             const t = document.getElementById('toast');
             if (t) { t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 4000); }
         }
 
+        // キーの保存UI更新
+        function updateKeyUI() {
+            const key = getEffectiveKey();
+            const badge = document.getElementById('key-badge');
+            const input = document.getElementById('api-key-input');
+            if (key) {
+                badge.textContent = "設定済み";
+                badge.className = "text-[9px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-500";
+                input.value = key;
+            } else {
+                badge.textContent = "未設定";
+                badge.className = "text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
+            }
+        }
+
         // 初期化処理
         document.addEventListener('DOMContentLoaded', () => {
             initFirebase();
+            updateKeyUI();
             
             // ビュー切り替え
             document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
             document.getElementById('close-settings-btn').onclick = () => switchView('main-view');
             document.getElementById('open-map-btn').onclick = () => switchView('map-overlay');
             document.getElementById('close-map-btn').onclick = () => switchView('main-view');
+
+            // APIキー保存ボタン
+            document.getElementById('save-key-btn').onclick = () => {
+                const newKey = document.getElementById('api-key-input').value.trim();
+                if (newKey) {
+                    localStorage.setItem('GEMINI_API_KEY', newKey);
+                    showToast("キーを保存したで！次から入力いらへんよ。");
+                    updateKeyUI();
+                    generateSakuraIcon();
+                } else {
+                    localStorage.removeItem('GEMINI_API_KEY');
+                    showToast("キーを削除したで。");
+                    updateKeyUI();
+                }
+            };
 
             // モード切替
             const walkBtn = document.getElementById('mode-walking');
@@ -477,7 +512,6 @@
                 driveBtn.classList.add('active');
                 document.getElementById('nav-hud').style.display = 'flex'; 
             };
-            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
 
             // 記録開始・停止
             const recordBtn = document.getElementById('record-toggle-btn');
@@ -502,10 +536,10 @@
             document.getElementById('google-login-btn').onclick = async () => {
                 if (!auth) { alert("Firebaseの設定をしてな！"); return; }
                 try { await signInWithPopup(auth, new GoogleAuthProvider()); } 
-                catch (e) { console.error(e); alert("ログイン失敗: " + e.message); }
+                catch (e) { alert("ログイン失敗: " + e.message); }
             };
 
-            // マイク（音声認識）
+            // マイク
             const micBtn = document.getElementById('ai-mic-btn');
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr && micBtn) {
@@ -525,7 +559,6 @@
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
             } catch(e) {}
 
-            // 位置情報監視開始
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
             }
@@ -533,13 +566,6 @@
             document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
             document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
             document.getElementById('regenerate-icon-btn').onclick = () => generateSakuraIcon();
-            
-            const keyStatus = document.getElementById('status-text');
-            const effectiveKey = getEffectiveKey();
-            if(effectiveKey) {
-                keyStatus.textContent = "APIキー設定済み！";
-                keyStatus.className = "text-xs font-bold text-green-500";
-            }
             
             generateSakuraIcon();
             lucide.createIcons();
