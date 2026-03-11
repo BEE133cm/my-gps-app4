@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v15.6 (HUD Layout Fixed)</title>
+    <title>GPS Tracker Pro v15.7 (Net & Address Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -26,7 +26,7 @@
         .ai-pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
         
-        /* Nav HUD - Adjusted to be part of flow */
+        /* Nav HUD */
         #nav-hud { 
             display: none; 
             background: rgba(30, 41, 59, 0.95); 
@@ -47,14 +47,14 @@
     <!-- --- MAIN RECORD PAGE --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-24">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.6</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.7</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="history"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="settings"></i></button>
             </div>
         </header>
 
-        <!-- Navigation HUD (Integrated into flow) -->
+        <!-- Navigation HUD -->
         <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
             <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
             <div class="flex-grow">
@@ -107,7 +107,7 @@
         </div>
     </div>
 
-    <!-- AI Container (Icon + Chat Bubble) -->
+    <!-- AI Container -->
     <div id="ai-container">
         <div id="ai-avatar" class="ai-pulse">
             <div id="ai-loading-icon" class="w-full h-full flex items-center justify-center bg-pink-100 text-pink-500">
@@ -121,7 +121,7 @@
         </div>
     </div>
 
-    <!-- Floating AI Mic Button -->
+    <!-- AI Mic Button -->
     <button id="ai-mic-btn" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white z-50 active:scale-90 transition-all">
         <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
     </button>
@@ -188,7 +188,7 @@
         let db, auth, appId;
         let map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
-        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null;
+        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null, lastAddressFetchTime = 0;
 
         const views = { main: document.getElementById('main-view'), map: document.getElementById('map-overlay'), history: document.getElementById('history-view'), settings: document.getElementById('settings-view') };
 
@@ -223,6 +223,26 @@
                     delay *= 2;
                 }
             }
+        }
+
+        // --- Address Fetch (Nominatim) ---
+        async function updateAddress(lat, lng) {
+            const now = Date.now();
+            if (now - lastAddressFetchTime < 10000) return; // 10秒毎に制限
+            lastAddressFetchTime = now;
+            try {
+                const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`, {
+                    headers: { 'Accept-Language': 'ja' }
+                });
+                const data = await resp.json();
+                if (data && data.address) {
+                    const a = data.address;
+                    const readable = [a.province || a.state, a.city || a.town || a.village, a.suburb || a.district].filter(Boolean).join(' ');
+                    lastAddress = readable || "住所の詳細が不明やわ";
+                    const el = document.getElementById('address-display');
+                    if (el) el.textContent = lastAddress;
+                }
+            } catch (e) { console.warn("Address fetch failed."); }
         }
 
         // --- Character Icon ---
@@ -313,8 +333,15 @@
             lastSuccessTimestamp = Date.now();
             currentPos = [lat, lng];
             setGPSStatus(true);
+            
+            // 住所更新
+            if (!isTracking || historyPoints.length === 0) {
+                updateAddress(lat, lng);
+            }
+
             if (isTracking) requestWakeLock();
             if(marker) marker.setLatLng(currentPos);
+            
             document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
             document.getElementById('accuracy-text').textContent = `精度: ${Math.round(pos.coords.accuracy)} m`;
             
@@ -427,7 +454,7 @@
                 else if (respText) respText.textContent = "ちょっと分からへんかったわ...";
             } catch (err) {
                 console.error("AI Error:", err.message);
-                if (respText) respText.textContent = err.message.includes("401") ? err.message : "ごめん、通信エラーやわ。";
+                if (respText) respText.textContent = err.message.includes("APIキー") ? err.message : "ごめん、通信エラーやわ。";
             } finally { isAIThinking = false; }
         }
 
@@ -454,7 +481,6 @@
             const activeBtn = document.getElementById(`mode-${mode}`);
             if (activeBtn) activeBtn.classList.add('active');
             showToast(mode === 'driving' ? "ドライブモードやで！安全運転！" : "ウォーキングモードやで");
-            // HUD Visibility
             const hud = document.getElementById('nav-hud');
             if (hud) hud.style.display = (mode === 'driving' ? 'flex' : 'none');
         }
@@ -494,7 +520,6 @@
             document.getElementById('ai-mic-btn').onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
         }
 
-        // Navigation
         document.getElementById('open-settings-btn').onclick = () => switchView('settings');
         document.getElementById('close-settings-btn').onclick = () => switchView('main');
         document.getElementById('open-history-btn').onclick = () => switchView('history');
