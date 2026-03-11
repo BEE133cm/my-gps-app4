@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v15.2 (Sakura Anime Style)</title>
+    <title>GPS Tracker Pro v15.4 (User Defined & Drive Fixed)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -37,7 +37,7 @@
     <!-- --- MAIN RECORD PAGE --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-24">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.2</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v15.4</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="history"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2 rounded-full shadow-sm border border-gray-100 text-gray-600 active:scale-95 transition-transform"><i data-lucide="settings"></i></button>
@@ -138,7 +138,7 @@
 
     <div id="settings-view" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between">
-            <button id="close-settings-btn" class="font-bold text-gray-600 flex items-center gap-1 active:scale-95"><i data-lucide="chevron-left"></i> 戻る</button>
+            <button id="close-settings-btn" class="font-bold text-gray-600 flex items-center gap-1 active:scale-95 transition-transform"><i data-lucide="chevron-left"></i> 戻る</button>
             <h2 class="font-bold">アプリ設定</h2>
             <div class="w-8"></div>
         </header>
@@ -173,13 +173,16 @@
         const apiKey = ""; 
         let db, auth, appId;
         
+        // --- SAFE FIREBASE INIT ---
         try {
-            const firebaseConfig = JSON.parse(__firebase_config);
-            const app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        } catch (e) { console.error("Config missing:", e.message); }
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            }
+        } catch (e) { console.warn("Firebase config missing or invalid."); }
 
         // --- Helper: Exponential Backoff API ---
         async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
@@ -224,9 +227,10 @@
         }
 
         // State
-        let user = null, map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
+        let user = null; // FIXED: Missing variable definition
+        let map = null, marker = null, polyline = null, currentPos = null, isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 0.8, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
-        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null;
+        let lastAlertOrbisId = null, lastSuccessTimestamp = 0, wakeLock = null, timerInterval = null;
 
         const views = { main: document.getElementById('main-view'), map: document.getElementById('map-overlay'), history: document.getElementById('history-view'), settings: document.getElementById('settings-view') };
 
@@ -295,7 +299,6 @@
             setGPSStatus(true);
             if (isTracking) requestWakeLock();
             
-            // Map guard
             if(marker) marker.setLatLng(currentPos);
             
             document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
@@ -391,35 +394,34 @@
             } finally { isAIThinking = false; }
         }
 
-        // Auth
-        onAuthStateChanged(auth, (u) => {
-            user = u;
-            const loginBtn = document.getElementById('google-login-btn');
-            const userInfo = document.getElementById('user-info');
-            if (user) {
-                if (loginBtn) loginBtn.classList.add('hidden');
-                if (userInfo) userInfo.classList.replace('hidden', 'flex');
-                document.getElementById('user-name').textContent = user.displayName;
-                document.getElementById('user-email').textContent = user.email;
-                if (user.photoURL) document.getElementById('user-photo').style.backgroundImage = `url(${user.photoURL})`;
-            }
-        });
+        // --- Auth Guard ---
+        if (auth) {
+            onAuthStateChanged(auth, (u) => {
+                user = u;
+                const loginBtn = document.getElementById('google-login-btn');
+                const userInfo = document.getElementById('user-info');
+                if (user) {
+                    if (loginBtn) loginBtn.classList.add('hidden');
+                    if (userInfo) userInfo.classList.replace('hidden', 'flex');
+                    document.getElementById('user-name').textContent = user.displayName;
+                    document.getElementById('user-email').textContent = user.email;
+                    if (user.photoURL) document.getElementById('user-photo').style.backgroundImage = `url(${user.photoURL})`;
+                }
+            });
+        }
 
-        // Mode Toggles - Explicitly added
+        // --- Mode Toggles ---
         function setMode(mode) {
             currentMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`mode-${mode}`).classList.add('active');
+            const activeBtn = document.getElementById(`mode-${mode}`);
+            if (activeBtn) activeBtn.classList.add('active');
             showToast(mode === 'driving' ? "ドライブモードやで！安全運転！" : "ウォーキングモードやで");
-            if(mode === 'driving') {
-                document.getElementById('nav-hud').style.display = 'flex';
-            } else {
-                document.getElementById('nav-hud').style.display = 'none';
-            }
+            document.getElementById('nav-hud').style.display = (mode === 'driving' ? 'flex' : 'none');
         }
 
-        document.getElementById('mode-walking').onclick = (e) => { e.stopPropagation(); setMode('walking'); };
-        document.getElementById('mode-driving').onclick = (e) => { e.stopPropagation(); setMode('driving'); };
+        document.getElementById('mode-walking').onclick = () => setMode('walking');
+        document.getElementById('mode-driving').onclick = () => setMode('driving');
 
         document.getElementById('record-toggle-btn').onclick = () => {
             if(!isTracking) {
@@ -438,7 +440,7 @@
                     isTracking = false; 
                     clearInterval(timerInterval);
                     speakText("お疲れ様！保存しとくで。"); 
-                    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+                    if (wakeLock) { try { wakeLock.release(); } catch(e){} wakeLock = null; }
                     document.getElementById('btn-text').textContent = "記録開始";
                     document.getElementById('record-toggle-btn').classList.replace('bg-red-500', 'bg-green-500');
                 }
@@ -453,6 +455,7 @@
             document.getElementById('ai-mic-btn').onclick = () => { try { rec.start(); } catch(e) { rec.stop(); } };
         }
 
+        // Navigation
         document.getElementById('open-settings-btn').onclick = () => switchView('settings');
         document.getElementById('close-settings-btn').onclick = () => switchView('main');
         document.getElementById('open-history-btn').onclick = () => switchView('history');
@@ -460,27 +463,24 @@
         document.getElementById('open-map-btn').onclick = () => switchView('map');
         document.getElementById('close-map-btn').onclick = () => switchView('main');
         document.getElementById('regenerate-icon-btn').onclick = () => generateSakuraIcon();
+        
         document.getElementById('google-login-btn').onclick = async () => {
+            if (!auth) { showToast("Firebaseの設定を確認してな！"); return; }
             const provider = new GoogleAuthProvider();
             try { await signInWithPopup(auth, provider); showToast("ログイン成功！"); } catch(e) { showToast("ログイン失敗..."); }
         };
         document.getElementById('center-btn').onclick = () => { if(currentPos && map) { map.panTo(currentPos); map.setZoom(17); } };
-        document.getElementById('volume-slider').oninput = (e) => {
-            voiceVolume = e.target.value / 100;
-        };
-
-        let timerInterval = null;
+        document.getElementById('volume-slider').oninput = (e) => { voiceVolume = e.target.value / 100; };
 
         window.onload = () => {
             if(typeof lucide !== 'undefined') lucide.createIcons();
             
-            // Map Init
             try {
                 map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map);
                 marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
-            } catch(e) { console.error("Map Load Error:", e); }
+            } catch(e) { console.warn("Map load failed."); }
             
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(updateLocation, (err) => { setGPSStatus(false); }, { enableHighAccuracy: true });
