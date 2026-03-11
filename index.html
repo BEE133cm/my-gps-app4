@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.10 (Transparent Route & UI Update)</title>
+    <title>GPS Tracker Pro v17.11 (Conversation Memory)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -65,7 +65,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.10</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.11</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                     <i data-lucide="list"></i>
@@ -92,7 +92,6 @@
             <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded active:bg-red-400/20 transition-colors">停止</button>
         </div>
 
-        <!-- ★修正ポイント③：住所・GPSカード（ネットワークと精度表示の追加） -->
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-pink-500 flex flex-col gap-2 shrink-0">
             <div class="flex justify-between items-start gap-2">
                 <div id="address-display" class="text-sm font-bold text-gray-700 leading-tight flex-grow">住所を取得中...</div>
@@ -236,9 +235,11 @@
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = 1.0, lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0;
-        let bubbleTimer = null; // 吹き出しを消すためのタイマー変数
+        let bubbleTimer = null; 
+        
+        // ★会話の記憶を持たせるためのリスト
+        let chatHistory = []; 
 
-        // ネットワーク状態の監視と表示更新
         function updateNetworkStatus() {
             const statusEl = document.getElementById('network-status');
             if (navigator.onLine) {
@@ -318,6 +319,15 @@
             }
 
             isAIThinking = true;
+            
+            // ★ゆーみんの言葉を記憶に追加
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            
+            // 記憶が長すぎるとエラーになるから、直近の5往復分(10件)だけに制限
+            if (chatHistory.length > 10) {
+                chatHistory = chatHistory.slice(chatHistory.length - 10);
+            }
+
             try {
                 const sys = `あなたは神戸弁（関西弁）の明るく元気な女子学生AI「さくら」です。
 ユーザーの名前は「ゆうま」です。親しみを込めて「ゆーくん」「ゆーみん」「ゆうまくん」と時と場合によって呼び分けてな。
@@ -327,14 +337,21 @@
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
                 
                 const data = await apiFetch(url, {
-                    contents: [{ parts: [{ text: prompt }] }], 
+                    contents: chatHistory, // ★過去の記憶を全部まとめて送る！
                     systemInstruction: { parts: [{ text: sys }] },
                     tools: [{ "google_search": {} }]
                 });
+                
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (txt) speakText(txt);
+                if (txt) {
+                    // ★さくらのお返事も記憶に追加
+                    chatHistory.push({ role: "model", parts: [{ text: txt }] });
+                    speakText(txt);
+                }
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
+                // エラーになったら、さっきのゆーみんの言葉を記憶から消す（エラー回避のため）
+                chatHistory.pop();
                 showToast(`会話エラー: ${err.message}`, true); 
                 speakText("ごめんゆーみん、ちょっと電波が悪いみたいやわ。"); 
             } finally { 
@@ -348,9 +365,7 @@
             if (resp) resp.textContent = txt;
             if (bubble) bubble.style.display = 'block';
             
-            // ★修正ポイント①：タイマーで吹き出しを消す処理
             if (bubbleTimer) clearTimeout(bubbleTimer);
-            // 文字数に応じた時間、最低でも3秒は表示する
             const displayTime = Math.max(3000, txt.length * 200);
             bubbleTimer = setTimeout(() => {
                 bubble.style.display = 'none';
@@ -397,7 +412,6 @@
             currentPos = [lat, lng];
             updateAddress(lat, lng);
             
-            // ★修正ポイント③：GPS精度の表示更新と色変更
             const accEl = document.getElementById('gps-accuracy');
             if (accEl) {
                 const accVal = Math.round(accuracy);
@@ -512,7 +526,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            updateNetworkStatus(); // 初回のネットワークチェック
+            updateNetworkStatus(); 
             initFirebase();
             updateKeyUI();
             
@@ -523,18 +537,15 @@
             document.getElementById('open-history-btn').onclick = () => switchView('history-view');
             document.getElementById('close-history-btn').onclick = () => switchView('main-view');
 
-            // ★修正ポイント②：透過・軌跡のみの画像保存
             document.getElementById('save-map-image-btn').onclick = () => {
                 showToast("ゆーみんの軌跡を写真に撮るで！ちょっと待ってな！");
                 
-                // 背景の地図タイルを一時的に見えなくする（透明にする）
                 const tilePane = document.querySelector('.leaflet-tile-pane');
                 if (tilePane) tilePane.style.opacity = '0';
                 
-                // html2canvasで透過オプション(backgroundColor: null)をつけてキャプチャ
                 html2canvas(document.getElementById('map'), { 
                     useCORS: true,
-                    backgroundColor: null // これで背景が透明になるで！
+                    backgroundColor: null 
                 }).then(canvas => {
                     const link = document.createElement('a');
                     link.download = `sakura_route_${Date.now()}.png`;
@@ -545,7 +556,6 @@
                 }).catch(e => {
                     showToast("ごめん、保存に失敗してもうた！");
                 }).finally(() => {
-                    // キャプチャが終わったら地図タイルを元に戻す
                     if (tilePane) tilePane.style.opacity = '1';
                 });
             };
