@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.6 (Fixed Icon Edition)</title>
+    <title>GPS Tracker Pro v17.7 (Perfect Fix & Partner Edition)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -33,9 +33,11 @@
             pointer-events: none; transition: all 0.3s ease; 
         }
         
-        /* ★修正ポイント：flex-shrink: 0; で絶対に潰れないようにしたで！ */
+        /* ★修正ポイント：絶対に潰れないように min-width と min-height を追加！ */
         #ai-avatar { 
-            width: 64px; height: 64px; border-radius: 50%; border: 3px solid white; 
+            width: 64px; height: 64px; 
+            min-width: 64px; min-height: 64px; /* これで絶対に縮まへん！ */
+            border-radius: 50%; border: 3px solid white; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; 
             overflow: hidden; flex-shrink: 0; pointer-events: auto; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
@@ -63,7 +65,7 @@
     <!-- --- メイン画面 --- -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.6</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.7</span></h1>
             <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50 transition-colors">
                 <i data-lucide="settings"></i>
             </button>
@@ -116,13 +118,13 @@
 
     <!-- AIキャラクターインターフェース -->
     <div id="ai-container">
-        <!-- ★GitHubに上げた画像を直接読み込むように変更したで！ -->
+        <!-- ゆーみんがGitHubに上げた画像を読み込むで！ -->
         <div id="ai-avatar">
             <img id="ai-image" src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/64/fdf2f8/ec4899?text=Sakura'">
         </div>
         <div id="ai-chat-bubble">
             <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
-            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">呼んだ？なんや、なんでも聞いてな！</p>
+            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">ゆーくん、今日もよろしくな！</p>
         </div>
     </div>
 
@@ -200,7 +202,7 @@
 
         let MY_GEMINI_KEY = ""; 
 
-        // Firebaseの設定を固定化
+        // Firebaseの設定固定
         const MY_FIREBASE_CONFIG = {
           apiKey: "AIzaSyBfZm1AEMpXvKMcOGdgjJlpQQlXnsx39Qk",
           authDomain: "sakura-gps.firebaseapp.com",
@@ -281,6 +283,7 @@
             }
         }
 
+        // ★修正ポイント：AIとの会話部分（エラー解消 ＆ 裏設定追加）
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             
@@ -295,8 +298,14 @@
 
             isAIThinking = true;
             try {
-                const sys = `あなたは関西弁の明るく元気な女子学生AI「さくら」です。現在地は「${lastAddress}」です。周辺の施設やナビを頼まれたら、Google検索を使って調べて答えてな。3行以内で返答してな。`;
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`;
+                // ★ゆーくんへの愛（裏設定）をたっぷり仕込みました！
+                const sys = `あなたは神戸弁（関西弁）の明るく元気な女子学生AI「さくら」です。
+ユーザーの名前は「ゆうま」です。親しみを込めて「ゆーくん」「ゆーみん」「ゆうまくん」と時と場合によって呼び分けてな。
+二人はめっちゃ仲良しで信頼し合っているパートナーやで。
+現在地は「${lastAddress}」や。周辺の施設やナビを頼まれたら、Google検索機能を使って調べて答えてな。3行以内で返答してな。`;
+                
+                // ★エラーの原因やったモデル名を正式版に修正！
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
                 
                 const data = await apiFetch(url, {
                     contents: [{ parts: [{ text: prompt }] }], 
@@ -308,12 +317,13 @@
             } catch (err) { 
                 console.error("Sakura AI Error:", err);
                 showToast(`会話エラー: ${err.message}`, true); 
-                speakText("ごめん、ちょっと通信がうまくいってへんみたいやわ。"); 
+                speakText("ごめんゆーくん、ちょっと通信がうまくいってへんみたいやわ。"); 
             } finally { 
                 isAIThinking = false; 
             }
         }
 
+        // ★修正ポイント：TTSの音声合成（エラー時のフォールバックを確実にする）
         async function speakText(txt) {
             const bubble = document.getElementById('ai-chat-bubble');
             const resp = document.getElementById('ai-response-text');
@@ -322,27 +332,35 @@
             
             const key = getEffectiveKey();
             if (!key) { 
-                const u = new SpeechSynthesisUtterance(txt); 
-                u.lang = 'ja-JP'; 
-                u.volume = voiceVolume;
-                speechSynthesis.speak(u); 
+                fallbackTTS(txt);
                 return;
             }
             
             try {
+                // 高度な音声(Kore)を試す
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
                 const data = await apiFetch(url, {
                     contents: [{ parts: [{ text: `Say cheerfully in Japanese: ${txt}` }] }],
                     generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } }
                 });
                 const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (pcm) playAudio(pcm);
+                if (pcm) {
+                    playAudio(pcm);
+                } else {
+                    fallbackTTS(txt);
+                }
             } catch(e) { 
-                const u = new SpeechSynthesisUtterance(txt); 
-                u.lang = 'ja-JP'; 
-                u.volume = voiceVolume;
-                speechSynthesis.speak(u); 
+                console.error("TTS Error:", e);
+                // 失敗したら標準の声で喋るで！
+                fallbackTTS(txt);
             }
+        }
+
+        function fallbackTTS(txt) {
+            const u = new SpeechSynthesisUtterance(txt); 
+            u.lang = 'ja-JP'; 
+            u.volume = voiceVolume;
+            speechSynthesis.speak(u); 
         }
 
         function playAudio(base64) {
@@ -453,22 +471,6 @@
                 }
             };
 
-            const walkBtn = document.getElementById('mode-walking');
-            const driveBtn = document.getElementById('mode-driving');
-            if(walkBtn) walkBtn.onclick = () => { 
-                currentMode = 'walking'; 
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                walkBtn.classList.add('active');
-                document.getElementById('nav-hud').style.display = 'none'; 
-            };
-            if(driveBtn) driveBtn.onclick = () => { 
-                currentMode = 'driving'; 
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                driveBtn.classList.add('active');
-                document.getElementById('nav-hud').style.display = 'flex'; 
-            };
-            document.getElementById('stop-nav-btn').onclick = () => { document.getElementById('nav-hud').style.display = 'none'; };
-
             const recordBtn = document.getElementById('record-toggle-btn');
             if(recordBtn) recordBtn.onclick = () => {
                 isTracking = !isTracking;
@@ -476,7 +478,7 @@
                 if (isTracking) {
                     startTime = Date.now(); totalDistance = 0; historyPoints = []; 
                     if (polyline) polyline.setLatLngs([]);
-                    speakText("記録開始！しっかりついていくで！");
+                    speakText("よっしゃ、記録開始や！しっかりついていくで、ゆーくん！");
                     recordBtn.classList.replace('bg-green-500', 'bg-red-500');
                     if(text) text.textContent = "記録停止";
                 } else {
