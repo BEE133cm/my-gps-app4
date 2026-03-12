@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.24 (Firebase Auth Fix)</title>
+    <title>GPS Tracker Pro v17.26 (Ultimate Button Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -13,17 +13,30 @@
         body, html { height: 100%; margin: 0; overflow: hidden; background-color: #f3f4f6; position: fixed; width: 100%; touch-action: manipulation; }
         .view-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; background: #f3f4f6; z-index: 10; }
         .view-screen.active { display: flex; }
-        #settings-view, #map-overlay, #history-view, #detail-view { z-index: 100; }
-        .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; }
+        
+        /* レイヤー優先順位の整理 */
+        #main-view { z-index: 10; }
+        #history-view, #detail-view, #settings-view, #map-overlay { z-index: 200; }
+        
+        .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; }
         #map, #detail-map { flex-grow: 1; width: 100%; position: relative; z-index: 1; border-radius: 1rem; overflow: hidden; }
-        #ai-container { position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 280px; display: flex; align-items: flex-end; gap: 12px; z-index: 80; pointer-events: none; transition: all 0.3s ease; }
+        
+        /* モード切替ボタンの強化 */
+        .mode-btn { cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative; z-index: 50; }
+        .mode-btn i { pointer-events: none; } /* アイコンがクリックを邪魔しないように */
+        .mode-btn.active { background-color: #ec4899 !important; color: white !important; box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4); }
+        
+        /* AIキャラクター */
+        #ai-container { position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 280px; display: flex; align-items: flex-end; gap: 12px; z-index: 80; pointer-events: none; }
         #ai-avatar { width: 64px; height: 64px; min-width: 64px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; overflow: hidden; pointer-events: auto; }
         #ai-avatar img { width: 100%; height: 100%; object-fit: cover; }
         #ai-chat-bubble { background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; pointer-events: auto; border-left: 4px solid #ec4899; }
-        #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 25; }
-        .mode-btn.active { background-color: #ec4899 !important; color: white !important; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3); }
+        
+        #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 40; }
+        
         .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 12px 20px; border-radius: 12px; z-index: 9999; display: none; font-size: 13px; width: 85%; max-width: 400px; text-align: center; }
         .recording { border: 4px solid #ec4899 !important; background-color: #fce7f3 !important; box-shadow: 0 0 20px rgba(236, 72, 153, 0.5) !important; }
+        
         #orbis-flash-overlay { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: none; mix-blend-mode: soft-light; }
         @keyframes flash-blue { 0%, 100% { background: rgba(191, 219, 254, 0); } 50% { background: rgba(191, 219, 254, 0.5); } }
         @keyframes flash-yellow { 0%, 100% { background: rgba(253, 224, 71, 0); } 50% { background: rgba(253, 224, 71, 0.6); } }
@@ -32,8 +45,6 @@
         .flash-yellow { display: block !important; animation: flash-yellow 1s infinite; }
         .flash-red { display: block !important; animation: flash-red 0.5s infinite; }
         .orbis-marker { background: #ef4444; color: white; border: 2px solid white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .history-item { cursor: pointer; transition: transform 0.2s; }
-        .history-item:active { transform: scale(0.98); }
     </style>
 </head>
 <body class="font-sans text-gray-800">
@@ -44,14 +55,15 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.24</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.26</span></h1>
             <div class="flex gap-2">
-                <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100"><i data-lucide="list"></i></button>
-                <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100"><i data-lucide="settings"></i></button>
+                <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
+                <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
             </div>
         </header>
 
-        <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 relative z-30">
+        <!-- モード切替: z-indexを高く設定 -->
+        <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 relative z-50">
             <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-4 rounded-xl font-black text-sm transition-all">
                 <i data-lucide="footprints" class="w-4 h-4"></i> ウォーキング
             </button>
@@ -101,7 +113,7 @@
         </button>
 
         <div class="flex flex-col gap-3 mt-auto shrink-0 pb-6 relative z-30">
-            <button id="record-toggle-btn" class="w-full bg-green-500 text-white font-black py-6 rounded-3xl shadow-lg text-xl flex items-center justify-center gap-3">
+            <button id="record-toggle-btn" class="w-full bg-green-500 text-white font-black py-6 rounded-3xl shadow-lg text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
                 <i data-lucide="play" id="btn-icon"></i><span id="btn-text">記録開始</span>
             </button>
         </div>
@@ -144,19 +156,9 @@
                 </div>
                 <div id="detail-map" style="height: 280px;" class="mt-2"></div>
             </div>
-
-            <div class="flex flex-col gap-3">
-                <p class="text-center text-xs font-bold text-gray-400 uppercase tracking-widest mt-2">記録を保存する</p>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="dl-full-btn" class="bg-pink-500 text-white font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-                        <i data-lucide="download"></i>
-                        <span class="text-[10px]">全部保存</span>
-                    </button>
-                    <button id="dl-no-map-btn" class="bg-white border-2 border-pink-500 text-pink-600 font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center justify-center gap-1 active:scale-95 transition-all">
-                        <i data-lucide="file-text"></i>
-                        <span class="text-[10px]">地図抜き保存</span>
-                    </button>
-                </div>
+            <div class="grid grid-cols-2 gap-3">
+                <button id="dl-full-btn" class="bg-pink-500 text-white font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center gap-1 active:scale-95"><i data-lucide="download"></i><span class="text-[10px]">全部保存</span></button>
+                <button id="dl-no-map-btn" class="bg-white border-2 border-pink-500 text-pink-600 font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center gap-1 active:scale-95"><i data-lucide="file-text"></i><span class="text-[10px]">地図抜き保存</span></button>
             </div>
         </div>
     </div>
@@ -195,9 +197,12 @@
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
             <div class="bg-white p-5 rounded-2xl border border-pink-100 shadow-sm flex flex-col gap-4">
-                <h3 class="text-xs font-bold text-pink-500 uppercase">Gemini AI キー設定</h3>
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-pink-500 uppercase">Gemini AI キー設定</h3>
+                    <div id="ai-status-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">未設定</div>
+                </div>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300">
-                <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm">キーを保存する</button>
+                <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存して有効化</button>
             </div>
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス設定</h3>
@@ -206,9 +211,7 @@
                     <div class="flex-grow"><input type="range" id="volume-slider" min="0" max="100" class="w-full accent-pink-500"></div>
                 </div>
             </div>
-            <div id="user-status-area" class="text-center p-2">
-                <p id="user-id-display" class="text-[10px] text-gray-400 break-all"></p>
-            </div>
+            <div id="user-status-area" class="text-center p-2"><p id="user-id-display" class="text-[10px] text-gray-400 break-all"></p></div>
         </div>
     </div>
 
@@ -219,7 +222,6 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, query, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global environment variables provided by system
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'sakura-tracker-v17';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
             apiKey: "AIzaSyBfZm1AEMpXvKMcOGdgjJlpQQlXnsx39Qk",
@@ -271,61 +273,92 @@
             audioUnlocked = true;
         }
 
-        // ★修正ポイント：Firebaseのログイン処理をプラットフォームのルールに従って修正
         const initFirebase = async () => {
             try {
                 const app = initializeApp(firebaseConfig);
-                auth = getAuth(app); 
-                db = getFirestore(app);
-
-                // RULE 3 - Auth Before Queries
+                auth = getAuth(app); db = getFirestore(app);
                 const initAuth = async () => {
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        try {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } catch (e) {
-                            console.error("Custom token sign-in failed, falling back to anonymous", e);
-                            await signInAnonymously(auth);
-                        }
-                    } else {
-                        await signInAnonymously(auth);
-                    }
+                        try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
+                    } else { await signInAnonymously(auth); }
                 };
                 await initAuth();
-
                 onAuthStateChanged(auth, (u) => { 
-                    user = u; 
-                    if (user) {
-                        document.getElementById('user-id-display').textContent = `User ID: ${user.uid}`;
-                        loadHistory(); 
-                    }
+                    user = u; if (user) { document.getElementById('user-id-display').textContent = `User ID: ${user.uid}`; loadHistory(); }
                 });
-            } catch (e) { 
-                console.error("Firebase Init Failed", e);
-                showToast("ログインに失敗したわ…画面を更新してみて！", true);
-            }
+            } catch (e) { console.error(e); }
         };
+
+        async function testAIConnection() {
+            const badge = document.getElementById('ai-status-badge');
+            const key = localStorage.getItem('GEMINI_API_KEY')?.trim();
+            if (!key) { badge.textContent = "未設定"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400"; return; }
+            badge.textContent = "検証中..."; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-500";
+            try {
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
+                });
+                if (resp.ok) { badge.textContent = "準備完了！"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600"; }
+                else { throw new Error(); }
+            } catch (e) { badge.textContent = "キー無効"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500"; }
+        }
+
+        async function apiFetch(url, body, retries = 3) {
+            const key = localStorage.getItem('GEMINI_API_KEY')?.trim() || "";
+            if (!key) { showToast("AIキーを設定してな！", true); throw new Error("KEY_MISSING"); }
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const resp = await fetch(`${url}?key=${key}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    if (!resp.ok) {
+                        const err = await resp.json();
+                        if (resp.status === 403) throw new Error("INVALID_KEY");
+                        if (resp.status === 429) throw new Error("QUOTA_EXCEEDED");
+                        throw new Error(err.error?.message || "API_ERROR");
+                    }
+                    return await resp.json();
+                } catch (err) {
+                    if (err.message === "INVALID_KEY" || err.message === "QUOTA_EXCEEDED" || i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delay)); delay *= 2;
+                }
+            }
+        }
+
+        async function askSakuraAI(prompt) {
+            if (!prompt || isAIThinking) return;
+            showToast(`ゆーみん: 「${prompt}」`);
+            isAIThinking = true; chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
+            try {
+                const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーみん」です。現在地: ${lastAddress}。3行以内で返答。`;
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent`, { 
+                    contents: chatHistory, systemInstruction: { parts: [{ text: sys }] }, tools: [{ "google_search": {} }] 
+                });
+                const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (txt) { chatHistory.push({ role: "model", parts: [{ text: txt }] }); speakText(txt); }
+            } catch (err) {
+                chatHistory.pop();
+                if (err.message === "INVALID_KEY") showToast("キーが違うみたいやわ。", true);
+                else if (err.message === "QUOTA_EXCEEDED") showToast("ちょっと休憩中や、また後でな！", true);
+                else showToast("通信エラーやわ…", true);
+            } finally { isAIThinking = false; }
+        }
 
         async function speakText(txt) {
             if (isMuted) return;
-            const resp = document.getElementById('ai-response-text');
-            if (resp) resp.textContent = txt;
+            const resp = document.getElementById('ai-response-text'); if (resp) resp.textContent = txt;
             document.getElementById('ai-chat-bubble').style.display = 'block';
             if (bubbleTimer) clearTimeout(bubbleTimer);
             bubbleTimer = setTimeout(() => { document.getElementById('ai-chat-bubble').style.display = 'none'; }, Math.max(3000, txt.length * 200));
-            
-            const key = localStorage.getItem('GEMINI_API_KEY')?.trim();
-            if (key) {
-                try {
-                    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${key}`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } })
-                    });
-                    const data = await resp.json();
-                    const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                    if (pcm) { playAudio(pcm); return; }
-                } catch(e) {}
-            }
+            try {
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, { 
+                    contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], 
+                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } 
+                });
+                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                if (pcm) { playAudio(pcm); return; }
+            } catch(e) {}
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
@@ -349,8 +382,8 @@
             if (Date.now() - lastOrbisFetchTime < 60000) return;
             lastOrbisFetchTime = Date.now();
             try {
-                const queryStr = `[out:json];node["highway"="speed_camera"](around:10000,${lat},${lng});out;`;
-                const resp = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(queryStr)}`);
+                const q = `[out:json];node["highway"="speed_camera"](around:10000,${lat},${lng});out;`;
+                const resp = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
                 const data = await resp.json();
                 if (data.elements) {
                     ORBIS_LIST = data.elements.map(el => ({ lat: el.lat, lng: el.lon, name: el.tags.name || "固定式オービス" }));
@@ -360,9 +393,7 @@
         }
 
         function updateOrbisMarkers() {
-            if (!map) return;
-            orbisMarkers.forEach(m => map.removeLayer(m));
-            orbisMarkers = [];
+            if (!map) return; orbisMarkers.forEach(m => map.removeLayer(m)); orbisMarkers = [];
             ORBIS_LIST.forEach(orb => {
                 const icon = L.divIcon({ className: '', html: `<div class="orbis-marker"><i data-lucide="camera" style="width:18px;height:18px;"></i></div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
                 const m = L.marker([orb.lat, orb.lng], { icon: icon }).addTo(map).bindPopup(`<b class="text-red-500">${orb.name}</b>`);
@@ -388,9 +419,7 @@
 
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
-            currentPos = [lat, lng];
-            fetchOrbisData(lat, lng);
-            checkOrbis(lat, lng);
+            currentPos = [lat, lng]; fetchOrbisData(lat, lng); checkOrbis(lat, lng);
             if (marker) marker.setLatLng(currentPos);
             if (isTracking) {
                 if (historyPoints.length > 0) {
@@ -413,6 +442,7 @@
             const target = document.getElementById(id);
             if (target) {
                 target.classList.add('active');
+                if (id === 'settings-view') { document.getElementById('api-key-input').value = localStorage.getItem('GEMINI_API_KEY') || ""; testAIConnection(); }
                 if (id === 'map-overlay' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); updateOrbisMarkers(); }, 200);
                 if (id === 'detail-view' && detailMap) setTimeout(() => { detailMap.invalidateSize(); }, 200);
                 lucide.createIcons();
@@ -420,98 +450,43 @@
         }
 
         function showToast(msg, isError = false) {
-            const t = document.getElementById('toast');
-            if (t) { t.textContent = msg; t.style.display = 'block'; t.style.backgroundColor = isError ? '#ef4444' : '#000'; setTimeout(() => { if (t.textContent === msg) t.style.display = 'none'; }, 5000); }
+            const t = document.getElementById('toast'); if (t) { t.textContent = msg; t.style.display = 'block'; t.style.backgroundColor = isError ? '#ef4444' : '#000'; setTimeout(() => { if (t.textContent === msg) t.style.display = 'none'; }, 5000); }
         }
 
-        // 履歴の読み込み
         async function loadHistory() {
-            if (!user || !db) return;
-            const listEl = document.getElementById('history-list'); if (!listEl) return;
+            if (!user || !db) return; const listEl = document.getElementById('history-list'); if (!listEl) return;
             try {
                 const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'routes'));
                 const querySnapshot = await getDocs(q);
-                let items = [];
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if(data.userId === user.uid) items.push({ id: doc.id, ...data });
-                });
+                let items = []; querySnapshot.forEach((doc) => { const data = doc.data(); if(data.userId === user.uid) items.push({ id: doc.id, ...data }); });
                 items.sort((a,b) => b.startTime - a.startTime);
-
                 listEl.innerHTML = items.length ? '' : '<p class="text-center text-gray-400 mt-10">記録がまだあらへんわ。</p>';
                 items.forEach(item => {
                     const div = document.createElement('div');
                     div.className = "history-item bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 active:scale-95 transition-all";
-                    div.innerHTML = `
-                        <div class="bg-pink-100 p-3 rounded-full text-pink-500 shrink-0"><i data-lucide="${item.mode==='walking'?'footprints':'car'}"></i></div>
-                        <div class="flex-grow">
-                            <p class="font-bold text-sm">${new Date(item.startTime).toLocaleString('ja-JP')}</p>
-                            <p class="text-[10px] text-gray-400">距離: ${(item.distance/1000).toFixed(2)} km</p>
-                        </div>
-                        <i data-lucide="chevron-right" class="text-gray-300"></i>
-                    `;
-                    div.onclick = () => openRecordDetail(item);
-                    listEl.appendChild(div);
+                    div.innerHTML = `<div class="bg-pink-100 p-3 rounded-full text-pink-500 shrink-0"><i data-lucide="${item.mode==='walking'?'footprints':'car'}"></i></div><div class="flex-grow"><p class="font-bold text-sm">${new Date(item.startTime).toLocaleString('ja-JP')}</p><p class="text-[10px] text-gray-400">距離: ${(item.distance/1000).toFixed(2)} km</p></div><i data-lucide="chevron-right" class="text-gray-300"></i>`;
+                    div.onclick = () => openRecordDetail(item); listEl.appendChild(div);
                 });
                 lucide.createIcons();
-            } catch (e) { console.error("History Load Error", e); }
+            } catch (e) {}
         }
 
         function openRecordDetail(item) {
-            document.getElementById('detail-date').textContent = new Date(item.startTime).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            document.getElementById('detail-date').textContent = new Date(item.startTime).toLocaleString('ja-JP');
             document.getElementById('detail-dist').textContent = (item.distance / 1000).toFixed(2);
-            
             const diff = Math.floor((item.endTime - item.startTime) / 1000);
-            const hrs = String(Math.floor(diff / 3600)).padStart(2, '0');
-            const mins = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
-            const secs = String(diff % 60).padStart(2, '0');
-            document.getElementById('detail-time').textContent = `${hrs}:${mins}:${secs}`;
-            
+            document.getElementById('detail-time').textContent = `${String(Math.floor(diff/3600)).padStart(2,'0')}:${String(Math.floor((diff%3600)/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
             document.getElementById('detail-mode-badge').innerHTML = `<i data-lucide="${item.mode==='walking'?'footprints':'car'}" class="w-3 h-3"></i> ${item.mode==='walking'?'ウォーキング':'ドライブ'}`;
-
             switchView('detail-view');
-
-            if (!detailMap) {
-                detailMap = L.map('detail-map', { zoomControl: false });
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMap);
-            }
+            if (!detailMap) { detailMap = L.map('detail-map', { zoomControl: false }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMap); }
             if (detailPolyline) detailMap.removeLayer(detailPolyline);
-
             const points = JSON.parse(item.points);
-            if (points && points.length > 0) {
-                const latlngs = points.map(p => [p.lat, p.lng]);
-                detailPolyline = L.polyline(latlngs, { color: '#ec4899', weight: 5 }).addTo(detailMap);
-                detailMap.fitBounds(detailPolyline.getBounds(), { padding: [20, 20] });
-            }
+            if (points && points.length > 0) { const latlngs = points.map(p => [p.lat, p.lng]); detailPolyline = L.polyline(latlngs, { color: '#ec4899', weight: 5 }).addTo(detailMap); detailMap.fitBounds(detailPolyline.getBounds(), { padding: [20, 20] }); }
             lucide.createIcons();
         }
 
-        async function downloadCapture(withMap) {
-            showToast("画像を作ってるで、ちょっと待ってな！");
-            const area = document.getElementById('capture-area');
-            const mapEl = document.getElementById('detail-map');
-            
-            const originalStyle = mapEl.style.display;
-            if (!withMap) mapEl.style.display = 'none';
-
-            try {
-                const canvas = await html2canvas(area, { useCORS: true, backgroundColor: '#ffffff', scale: 2 });
-                const link = document.createElement('a');
-                link.download = `sakura_record_${Date.now()}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-                showToast("保存完了！アルバムを見てみてな！");
-            } catch (e) {
-                showToast("保存に失敗してもうた！", true);
-            } finally {
-                mapEl.style.display = originalStyle;
-            }
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
-            updateNetworkStatus(); 
-            initFirebase(); 
-            updateClocks();
+            updateNetworkStatus(); initFirebase(); updateClocks();
             document.body.addEventListener('touchstart', unlockAudio, { once: true });
             
             document.getElementById('open-settings-btn').onclick = () => switchView('settings-view');
@@ -522,58 +497,54 @@
             document.getElementById('close-history-btn').onclick = () => switchView('main-view');
             document.getElementById('close-detail-btn').onclick = () => switchView('history-view');
 
-            document.getElementById('dl-full-btn').onclick = () => downloadCapture(true);
-            document.getElementById('dl-no-map-btn').onclick = () => downloadCapture(false);
+            document.getElementById('dl-full-btn').onclick = async () => { showToast("作成中..."); const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); const link = document.createElement('a'); link.download = `record_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
+            document.getElementById('dl-no-map-btn').onclick = async () => { const mapEl = document.getElementById('detail-map'); mapEl.style.display = 'none'; const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); mapEl.style.display = 'block'; const link = document.createElement('a'); link.download = `stats_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
 
-            document.getElementById('save-key-btn').onclick = () => { localStorage.setItem('GEMINI_API_KEY', document.getElementById('api-key-input').value.trim()); showToast("保存完了！"); };
-            
-            const slider = document.getElementById('volume-slider');
-            slider.value = voiceVolume * 100;
-            slider.oninput = (e) => { voiceVolume = e.target.value / 100; localStorage.setItem('voiceVolume', voiceVolume); };
-
-            const muteBtn = document.getElementById('mute-toggle-btn');
-            const updateMuteUI = () => {
-                document.getElementById('mute-icon').setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2');
-                muteBtn.classList.toggle('text-red-500', isMuted);
-                lucide.createIcons();
+            document.getElementById('save-key-btn').onclick = async () => { 
+                const key = document.getElementById('api-key-input').value.trim(); localStorage.setItem('GEMINI_API_KEY', key); 
+                showToast("保存完了！AIを確認するわな..."); await testAIConnection();
             };
-            muteBtn.onclick = () => { isMuted = !isMuted; localStorage.setItem('isMuted', isMuted); updateMuteUI(); };
-            updateMuteUI();
+            
+            const slider = document.getElementById('volume-slider'); slider.value = voiceVolume * 100;
+            slider.oninput = (e) => { voiceVolume = e.target.value / 100; localStorage.setItem('voiceVolume', voiceVolume); };
+            const muteBtn = document.getElementById('mute-toggle-btn');
+            muteBtn.onclick = () => { isMuted = !isMuted; localStorage.setItem('isMuted', isMuted); document.getElementById('mute-icon').setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2'); muteBtn.classList.toggle('text-red-500', isMuted); lucide.createIcons(); };
 
+            // ★修正ポイント：モード切替ボタンの反応を確実に
             const walkBtn = document.getElementById('mode-walking');
             const driveBtn = document.getElementById('mode-driving');
-            walkBtn.onclick = () => { currentMode = 'walking'; walkBtn.classList.add('active'); driveBtn.classList.remove('active'); document.getElementById('nav-hud').style.display = 'none'; };
-            driveBtn.onclick = () => { currentMode = 'driving'; driveBtn.classList.add('active'); walkBtn.classList.remove('active'); document.getElementById('nav-hud').style.display = 'flex'; };
+            const hud = document.getElementById('nav-hud');
+
+            walkBtn.addEventListener('click', (e) => {
+                e.preventDefault(); currentMode = 'walking';
+                walkBtn.classList.add('active'); driveBtn.classList.remove('active'); driveBtn.classList.add('bg-gray-50', 'text-gray-400');
+                hud.style.display = 'none';
+            });
+
+            driveBtn.addEventListener('click', (e) => {
+                e.preventDefault(); currentMode = 'driving';
+                driveBtn.classList.add('active'); driveBtn.classList.remove('bg-gray-50', 'text-gray-400');
+                walkBtn.classList.remove('active'); walkBtn.classList.add('bg-gray-50', 'text-gray-400');
+                hud.style.display = 'flex';
+            });
+
+            document.getElementById('stop-nav-btn').onclick = () => hud.style.display = 'none';
 
             document.getElementById('record-toggle-btn').onclick = async () => {
-                // RULE 3: Guard Firestore operations with user check
-                if (!user || !db) {
-                    showToast("ログイン中やからちょっと待ってな！", true);
-                    return;
-                }
-
-                isTracking = !isTracking;
-                const text = document.getElementById('btn-text');
-                if (isTracking) { 
-                    startTime = Date.now(); totalDistance = 0; historyPoints = []; if(polyline) polyline.setLatLngs([]); speakText("記録開始！"); 
-                    document.getElementById('record-toggle-btn').classList.replace('bg-green-500', 'bg-red-500'); text.textContent = "記録停止"; 
-                } else { 
-                    speakText("保存するね！"); 
-                    document.getElementById('record-toggle-btn').classList.replace('bg-red-500', 'bg-green-500'); text.textContent = "記録開始"; 
-                    try {
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'routes'), { userId: user.uid, mode: currentMode, distance: totalDistance, startTime: startTime, endTime: Date.now(), points: JSON.stringify(historyPoints) }); 
-                        loadHistory(); 
-                    } catch (err) {
-                        console.error("Save Error", err);
-                        showToast("保存に失敗したわ…", true);
-                    }
-                }
+                if (!user || !db) { showToast("ログイン待ちやで！", true); return; }
+                isTracking = !isTracking; const text = document.getElementById('btn-text'); const icon = document.getElementById('btn-icon');
+                if (isTracking) { startTime = Date.now(); totalDistance = 0; historyPoints = []; if(polyline) polyline.setLatLngs([]); speakText("記録開始や！"); document.getElementById('record-toggle-btn').classList.replace('bg-green-500', 'bg-red-500'); text.textContent = "記録停止"; icon.setAttribute('data-lucide', 'square'); }
+                else { speakText("保存するね！"); document.getElementById('record-toggle-btn').classList.replace('bg-red-500', 'bg-green-500'); text.textContent = "記録開始"; icon.setAttribute('data-lucide', 'play'); try { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'routes'), { userId: user.uid, mode: currentMode, distance: totalDistance, startTime: startTime, endTime: Date.now(), points: JSON.stringify(historyPoints) }); loadHistory(); } catch (err) { showToast("失敗したわ…", true); } }
+                lucide.createIcons();
             };
 
-            map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map);
-            marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
+            const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (sr) {
+                const rec = new sr(); rec.lang = 'ja-JP'; rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
+                document.getElementById('ai-mic-btn').onclick = () => { unlockAudio(); showToast("🎙️ 聞いてるで！"); try { rec.start(); } catch(e) { rec.stop(); } };
+            }
+            map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map); marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
             if ("geolocation" in navigator) navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
             document.getElementById('center-btn').onclick = () => { if(currentPos) { map.panTo(currentPos); map.setZoom(17); } };
             lucide.createIcons();
