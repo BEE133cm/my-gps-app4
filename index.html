@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.30 (Quota & Model Fix)</title>
+    <title>GPS Tracker Pro v17.31 (API Validation Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.30</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.31</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -199,14 +199,9 @@
                 </div>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300">
                 <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存して有効化</button>
-                <div id="ai-error-detail" class="text-[9px] text-red-400 font-mono hidden bg-red-50 p-2 rounded leading-tight"></div>
+                <div id="ai-error-detail" class="text-[10px] text-gray-600 font-mono hidden bg-pink-50 p-3 rounded-lg leading-tight"></div>
             </div>
-            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">APIの制限について</h3>
-                <p class="text-[10px] text-gray-500 leading-relaxed">
-                    無料のAPIキーには「1分間に20回まで」の利用制限があります。会話エラーが出た場合は、10秒ほど待ってからもう一度試してみてな！
-                </p>
-            </div>
+            
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス設定</h3>
                 <div class="flex items-center gap-4">
@@ -245,7 +240,6 @@
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
         let isSpeechRecognizing = false;
 
-        // ★修正：Flashモデルをデフォルトに設定
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function updateNetworkStatus() {
@@ -296,7 +290,7 @@
             } catch (e) { console.error(e); }
         };
 
-        // ★修正ポイント：AI接続テストの安定化と自動選別 (Flash優先)
+        // ★修正ポイント：検証ロジックで429エラーを正しく検知してブレイクする
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
             const errorDetail = document.getElementById('ai-error-detail');
@@ -312,9 +306,7 @@
             
             const modelsToTry = [
                 "gemini-1.5-flash",
-                "gemini-2.0-flash-exp",
-                "gemini-1.5-pro",
-                "gemini-1.0-pro"
+                "gemini-2.0-flash"
             ];
 
             let lastResult = null;
@@ -334,19 +326,35 @@
                     }
                     const err = await resp.json();
                     lastResult = { status: resp.status, message: err.error?.message || "不明なエラー" };
+                    
                     if (resp.status === 403) break; // キー自体が無効
+                    if (resp.status === 429) {
+                        // 制限に引っかかった＝キーとモデルは正解なのでここで確定させる！
+                        currentWorkingModel = model;
+                        localStorage.setItem('AI_WORKING_MODEL', model);
+                        break;
+                    }
                 } catch (e) {
                     lastResult = { status: "Network", message: "ネットワークに繋がらへんわ" };
+                    break;
                 }
             }
 
-            if (lastResult.status === 403) badge.textContent = "キー無効(403)";
-            else if (lastResult.status === 429) badge.textContent = "制限中(429)";
-            else badge.textContent = `エラー(${lastResult.status})`;
+            if (lastResult.status === 403) {
+                badge.textContent = "キー無効(403)";
+                errorDetail.innerHTML = `キーが間違ってるか無効みたいやわ。<br>もう一回コピーし直してみてな！`;
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
+            } else if (lastResult.status === 429) {
+                badge.textContent = "制限中(429)";
+                errorDetail.innerHTML = `キーは合ってるけど、今は<b>利用制限（1分間に15回まで）</b>に引っかかってるわ！<br>1分くらい待ってから話しかけてみてな。`;
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-600";
+            } else {
+                badge.textContent = `エラー(${lastResult.status})`;
+                errorDetail.innerHTML = `理由: ${lastResult.message}`;
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
+            }
             
-            errorDetail.innerHTML = `理由: ${lastResult.message}<br><span class='text-[8px] opacity-70'>※無料版は1分間に20回までの制限があります。</span>`;
             errorDetail.classList.remove('hidden');
-            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
         }
 
         async function apiFetch(url, body, retries = 3) {
@@ -366,9 +374,7 @@
                     
                     const err = await resp.json();
                     if (resp.status === 429) {
-                        // 制限オーバー：指数バックオフで待機
                         if (i < retries - 1) {
-                            showToast(`混雑中やわ、${Math.ceil(delay/1000)}秒後にやり直すな...`);
                             await new Promise(r => setTimeout(r, delay));
                             delay *= 2;
                             continue;
@@ -380,8 +386,7 @@
                     
                 } catch (err) {
                     if (err.message === "INVALID_KEY" || err.message === "QUOTA_EXCEEDED" || i === retries - 1) throw err;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
+                    await new Promise(r => setTimeout(r, delay)); delay *= 2;
                 }
             }
         }
@@ -389,8 +394,7 @@
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             showToast(`ゆーみん: 「${prompt}」`);
-            isAIThinking = true; 
-            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            isAIThinking = true; chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
             
             try {
@@ -402,9 +406,9 @@
                 if (txt) { chatHistory.push({ role: "model", parts: [{ text: txt }] }); speakText(txt); }
             } catch (err) {
                 chatHistory.pop();
-                if (err.message === "INVALID_KEY") showToast("APIキーが間違ってるみたい。確認してみて！", true);
+                if (err.message === "INVALID_KEY") showToast("APIキーが間違ってるみたい。設定を確認してな！", true);
                 else if (err.message === "QUOTA_EXCEEDED") showToast("1分間の制限を超えたわ。ちょっと待ってな！", true);
-                else showToast("通信エラーやわ…電波いいかな？", true);
+                else showToast(`通信エラーやわ…`, true);
             } finally { isAIThinking = false; }
         }
 
@@ -584,10 +588,8 @@
             const handleWalk = (e) => { e.preventDefault(); currentMode = 'walking'; walkBtn.classList.add('active'); driveBtn.classList.remove('active'); driveBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'none'; };
             const handleDrive = (e) => { e.preventDefault(); currentMode = 'driving'; driveBtn.classList.add('active'); driveBtn.classList.remove('bg-gray-50', 'text-gray-400'); walkBtn.classList.remove('active'); walkBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'flex'; };
 
-            walkBtn.addEventListener('click', handleWalk);
-            walkBtn.addEventListener('touchend', handleWalk);
-            driveBtn.addEventListener('click', handleDrive);
-            driveBtn.addEventListener('touchend', handleDrive);
+            walkBtn.addEventListener('click', handleWalk); walkBtn.addEventListener('touchend', handleWalk);
+            driveBtn.addEventListener('click', handleDrive); driveBtn.addEventListener('touchend', handleDrive);
 
             document.getElementById('stop-nav-btn').onclick = () => hud.style.display = 'none';
 
