@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.35 (Fast AI Status)</title>
+    <title>GPS Tracker Pro v17.36 (GPS Error Handling Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.35</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.36</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -299,7 +299,6 @@
             } catch (e) { console.error(e); }
         };
 
-        // ★修正ポイント：保存済みの状態を画面を開いた時に素早く表示する
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
             const errorDetail = document.getElementById('ai-error-detail');
@@ -313,7 +312,6 @@
                 return;
             }
 
-            // manualKeyがない（＝画面を開いただけ）場合、過去の成功の記憶があればスキップ
             if (manualKey === undefined && storedStatus === 'SUCCESS' && storedModel) {
                 badge.textContent = "準備完了！";
                 errorDetail.innerHTML = `✅ <b>接続済み！</b><br>現在のAI: <code>${storedModel}</code>`;
@@ -327,26 +325,17 @@
             
             try {
                 const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-                
                 if (!listResp.ok) {
                     if (listResp.status === 403) throw new Error("INVALID_KEY");
                     throw new Error("LIST_FAILED");
                 }
-                
                 const listData = await listResp.json();
-                
                 const availableModels = listData.models.filter(m => 
-                    m.supportedGenerationMethods && 
-                    m.supportedGenerationMethods.includes("generateContent") &&
-                    m.name.includes("gemini")
+                    m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent") && m.name.includes("gemini")
                 );
-                
                 if (availableModels.length === 0) throw new Error("NO_MODELS");
                 
-                let bestModel = availableModels.find(m => m.name.includes("1.5-flash")) || 
-                                availableModels.find(m => m.name.includes("pro")) || 
-                                availableModels[0];
-                                
+                let bestModel = availableModels.find(m => m.name.includes("1.5-flash")) || availableModels.find(m => m.name.includes("pro")) || availableModels[0];
                 currentWorkingModel = bestModel.name.replace("models/", "");
                 localStorage.setItem('AI_WORKING_MODEL', currentWorkingModel);
                 
@@ -356,9 +345,7 @@
                 });
                 
                 if (pingResp.ok || pingResp.status === 429) {
-                    // ★接続成功の記憶を保存
                     localStorage.setItem('AI_CONNECTION_STATUS', 'SUCCESS');
-                    
                     if (pingResp.ok) {
                         badge.textContent = "準備完了！";
                         errorDetail.innerHTML = `✅ <b>接続成功！</b><br>ゆーみんのキーに最適なAI（<code>${currentWorkingModel}</code>）を設定したで！`;
@@ -376,11 +363,8 @@
                     const err = await pingResp.json();
                     throw new Error(err.error?.message || "PING_FAILED");
                 }
-                
             } catch (e) {
-                // ★失敗したら記憶を消す
                 localStorage.removeItem('AI_CONNECTION_STATUS');
-                
                 errorDetail.className = "text-[10px] text-red-500 font-mono mt-2 bg-red-50 p-3 rounded-lg leading-tight";
                 if (e.message === "INVALID_KEY") {
                     badge.textContent = "キー無効(403)";
@@ -400,30 +384,18 @@
         async function apiFetch(url, body, retries = 3) {
             const key = localStorage.getItem('GEMINI_API_KEY')?.trim() || "";
             if (!key) { showToast("AIキーを設定してな！", true); throw new Error("KEY_MISSING"); }
-            
             let delay = 1000;
             for (let i = 0; i < retries; i++) {
                 try {
-                    const resp = await fetch(`${url}?key=${key}`, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(body) 
-                    });
-                    
+                    const resp = await fetch(`${url}?key=${key}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
                     if (resp.ok) return await resp.json();
-                    
                     const err = await resp.json();
                     if (resp.status === 429) {
-                        if (i < retries - 1) {
-                            await new Promise(r => setTimeout(r, delay));
-                            delay *= 2;
-                            continue;
-                        }
+                        if (i < retries - 1) { await new Promise(r => setTimeout(r, delay)); delay *= 2; continue; }
                         throw new Error("QUOTA_EXCEEDED");
                     }
                     if (resp.status === 403) throw new Error("INVALID_KEY");
                     throw new Error(err.error?.message || "API_ERROR");
-                    
                 } catch (err) {
                     if (err.message === "INVALID_KEY" || err.message === "QUOTA_EXCEEDED" || i === retries - 1) throw err;
                     await new Promise(r => setTimeout(r, delay)); delay *= 2;
@@ -436,7 +408,6 @@
             showToast(`ゆーみん: 「${prompt}」`);
             isAIThinking = true; chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
-            
             try {
                 const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーみん」です。現在地: ${lastAddress}。3行以内で返答。`;
                 const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
@@ -509,10 +480,39 @@
             }
         }
 
+        // ★修正ポイント：GPSエラー時に画面に表示する
+        async function updateAddress(lat, lng) {
+            if (Date.now() - lastAddressFetchTime < 30000) return;
+            lastAddressFetchTime = Date.now();
+            try {
+                const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&zoom=18`, { headers: { 'Accept-Language': 'ja' } });
+                const data = await resp.json();
+                if (data && data.address) {
+                    const a = data.address;
+                    lastAddress = [a.province||a.state, a.city||a.town||a.village, a.suburb||a.neighbourhood, a.road, a.house_number].filter(Boolean).join('');
+                    const ad = document.getElementById('address-display');
+                    ad.textContent = lastAddress;
+                    ad.classList.remove('text-red-500'); // 成功したらエラー色解除
+                }
+            } catch (e) {}
+        }
+
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed } = pos.coords;
-            currentPos = [lat, lng]; fetchOrbisData(lat, lng); checkOrbis(lat, lng);
+            currentPos = [lat, lng]; 
+            document.getElementById('address-display').classList.remove('text-red-500'); // エラー色解除
+            
+            fetchOrbisData(lat, lng); checkOrbis(lat, lng);
+            updateAddress(lat, lng);
+            
+            const accEl = document.getElementById('gps-accuracy');
+            if (accEl) {
+                const accVal = Math.round(accuracy);
+                accEl.textContent = `精度: ${accVal}m`;
+                accEl.className = 'text-[10px] font-mono font-bold ' + (accVal <= 10 ? 'text-green-500' : accVal <= 30 ? 'text-yellow-500' : 'text-red-500');
+            }
             if (marker) marker.setLatLng(currentPos);
+            document.getElementById('location-display').textContent = `緯度: ${lat.toFixed(5)} / 経度: ${lng.toFixed(5)}`;
             if (isTracking) {
                 if (historyPoints.length > 0) {
                     const d = getDistance(historyPoints[historyPoints.length-1].lat, historyPoints[historyPoints.length-1].lng, lat, lng);
@@ -534,11 +534,7 @@
             const target = document.getElementById(id);
             if (target) {
                 target.classList.add('active');
-                if (id === 'settings-view') { 
-                    document.getElementById('api-key-input').value = localStorage.getItem('GEMINI_API_KEY') || ""; 
-                    // 引数なしで呼ぶと、保存済みの記憶を使って高速判定する
-                    testAIConnection(); 
-                }
+                if (id === 'settings-view') { document.getElementById('api-key-input').value = localStorage.getItem('GEMINI_API_KEY') || ""; testAIConnection(); }
                 if (id === 'map-overlay' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); updateOrbisMarkers(); }, 200);
                 if (id === 'detail-view' && detailMap) setTimeout(() => { detailMap.invalidateSize(); }, 200);
                 lucide.createIcons();
@@ -599,7 +595,6 @@
             document.getElementById('save-key-btn').onclick = async () => { 
                 const key = document.getElementById('api-key-input').value.trim(); 
                 localStorage.setItem('GEMINI_API_KEY', key); 
-                // ★明示的にキーを渡すと、記憶をリセットして再検証する
                 showToast("保存完了！AIを確認するわな..."); 
                 await testAIConnection(key);
             };
@@ -642,9 +637,28 @@
                 micBtn.addEventListener('touchend', handleMic);
             }
 
+            // ★修正ポイント：GPSエラー時のコールバックを追加
             map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             polyline = L.polyline([], { color: '#ec4899', weight: 6 }).addTo(map); marker = L.circleMarker([35.68, 139.76], { radius: 8, fillColor: "#ec4899", color: "#fff", weight: 3 }).addTo(map);
-            if ("geolocation" in navigator) navigator.geolocation.watchPosition(updateLocation, null, { enableHighAccuracy: true });
+            
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(
+                    updateLocation, 
+                    (err) => {
+                        console.warn("GPS Error:", err);
+                        const ad = document.getElementById('address-display');
+                        ad.classList.add('text-red-500');
+                        if (err.code === 1) ad.textContent = "位置情報の許可がないで！設定見てな。";
+                        else if (err.code === 2) ad.textContent = "電波悪くて場所がわからへん…";
+                        else if (err.code === 3) ad.textContent = "GPSの取得がタイムアウトしたわ。";
+                        else ad.textContent = "GPSエラーやわ…";
+                    }, 
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                );
+            } else {
+                document.getElementById('address-display').textContent = "この端末GPS使えへんみたいやわ…";
+            }
+            
             document.getElementById('center-btn').onclick = () => { if(currentPos) { map.panTo(currentPos); map.setZoom(17); } };
             lucide.createIcons();
         });
