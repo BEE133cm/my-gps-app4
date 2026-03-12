@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.28 (Speech Recognition Fix)</title>
+    <title>GPS Tracker Pro v17.29 (AI Model Auto-Selector)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -20,7 +20,6 @@
         .stat-card { background: white; padding: 1rem; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; align-items: center; }
         #map, #detail-map { flex-grow: 1; width: 100%; position: relative; z-index: 1; border-radius: 1rem; overflow: hidden; }
         
-        /* モード切替ボタンの強化 */
         .mode-btn { cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative; z-index: 50; touch-action: none; }
         .mode-btn i { pointer-events: none; }
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4); }
@@ -53,14 +52,13 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.28</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.29</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
             </div>
         </header>
 
-        <!-- モード切替: タッチ反応を強化 -->
         <div class="grid grid-cols-2 gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 relative z-50">
             <button id="mode-walking" class="mode-btn active flex items-center justify-center gap-2 py-4 rounded-xl font-black text-sm transition-all">
                 <i data-lucide="footprints" class="w-4 h-4"></i> ウォーキング
@@ -201,6 +199,7 @@
                 </div>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300">
                 <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存して有効化</button>
+                <div id="ai-error-detail" class="text-[10px] text-red-400 font-mono hidden"></div>
             </div>
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス設定</h3>
@@ -238,12 +237,10 @@
         let lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0, bubbleTimer = null, chatHistory = [], audioUnlocked = false;
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
-
-        // ★音声認識の二重起動防止用
         let isSpeechRecognizing = false;
 
-        const PREVIEW_MODEL = "gemini-2.5-flash-preview-09-2025";
-        const STABLE_MODEL = "gemini-1.5-flash";
+        // ★使用可能なモデルを動的に判定
+        let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function updateNetworkStatus() {
             const statusEl = document.getElementById('network-status');
@@ -293,37 +290,63 @@
             } catch (e) { console.error(e); }
         };
 
+        // ★AI接続テストの安定化と自動選別
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
+            const errorDetail = document.getElementById('ai-error-detail');
             const key = (manualKey !== undefined ? manualKey : localStorage.getItem('GEMINI_API_KEY'))?.trim();
-            if (!key) { badge.textContent = "未設定"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400"; return; }
+            
+            errorDetail.classList.add('hidden');
+            if (!key) {
+                badge.textContent = "未設定"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400";
+                return;
+            }
+            
             badge.textContent = "検証中..."; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-500";
             
-            async function tryModel(modelName) {
+            // 試行するモデルの優先順リスト
+            const modelsToTry = [
+                "gemini-2.5-flash-preview-09-2025",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro"
+            ];
+
+            let lastResult = null;
+            for (const model of modelsToTry) {
                 try {
-                    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`, {
+                    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
                     });
-                    if (resp.ok) return { success: true };
+                    
+                    if (resp.ok) {
+                        currentWorkingModel = model;
+                        localStorage.setItem('AI_WORKING_MODEL', model);
+                        badge.textContent = "準備完了！";
+                        badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
+                        return;
+                    }
+                    
                     const err = await resp.json();
-                    return { success: false, status: resp.status, message: err.error?.message };
-                } catch (e) { return { success: false, status: 0 }; }
+                    lastResult = { status: resp.status, message: err.error?.message || "Unknown error" };
+                    
+                    // キーが無効な場合は即座に終了（他のモデルを試しても無駄なため）
+                    if (resp.status === 403) break;
+                    
+                } catch (e) {
+                    lastResult = { status: "Network", message: e.message };
+                }
             }
 
-            let result = await tryModel(PREVIEW_MODEL);
-            if (!result.success && (result.status === 404 || result.status === 400)) {
-                result = await tryModel(STABLE_MODEL);
-            }
-
-            if (result.success) {
-                badge.textContent = "準備完了！"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
-            } else {
-                if (result.status === 403) badge.textContent = "キー無効(403)";
-                else if (result.status === 429) badge.textContent = "制限中(429)";
-                else badge.textContent = "エラー";
-                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
-            }
+            // 全て失敗した場合
+            if (lastResult.status === 403) badge.textContent = "キー無効(403)";
+            else if (lastResult.status === 429) badge.textContent = "制限中(429)";
+            else badge.textContent = `エラー(${lastResult.status})`;
+            
+            errorDetail.textContent = lastResult.message;
+            errorDetail.classList.remove('hidden');
+            badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
         }
 
         async function apiFetch(url, body, retries = 3) {
@@ -354,11 +377,9 @@
             if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
             try {
                 const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーみん」です。現在地: ${lastAddress}。3行以内で返答。`;
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${PREVIEW_MODEL}:generateContent`, { 
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
                     contents: chatHistory, systemInstruction: { parts: [{ text: sys }] }, tools: [{ "google_search": {} }] 
-                }).catch(() => apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${STABLE_MODEL}:generateContent`, { 
-                    contents: chatHistory, systemInstruction: { parts: [{ text: sys }] }, tools: [{ "google_search": {} }] 
-                }));
+                });
                 const txt = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (txt) { chatHistory.push({ role: "model", parts: [{ text: txt }] }); speakText(txt); }
             } catch (err) {
@@ -376,7 +397,7 @@
             if (bubbleTimer) clearTimeout(bubbleTimer);
             bubbleTimer = setTimeout(() => { document.getElementById('ai-chat-bubble').style.display = 'none'; }, Math.max(3000, txt.length * 200));
             try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, { 
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
                     contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], 
                     generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } 
                 });
@@ -525,8 +546,10 @@
             document.getElementById('dl-no-map-btn').onclick = async () => { const mapEl = document.getElementById('detail-map'); mapEl.style.display = 'none'; const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); mapEl.style.display = 'block'; const link = document.createElement('a'); link.download = `stats_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
 
             document.getElementById('save-key-btn').onclick = async () => { 
-                const key = document.getElementById('api-key-input').value.trim(); localStorage.setItem('GEMINI_API_KEY', key); 
-                showToast("保存完了！AIを確認するわな..."); await testAIConnection(key);
+                const key = document.getElementById('api-key-input').value.trim(); 
+                localStorage.setItem('GEMINI_API_KEY', key); 
+                showToast("保存完了！AIを確認するわな..."); 
+                await testAIConnection(key);
             };
             
             const slider = document.getElementById('volume-slider'); slider.value = voiceVolume * 100;
@@ -538,17 +561,8 @@
             const driveBtn = document.getElementById('mode-driving');
             const hud = document.getElementById('nav-hud');
 
-            const handleWalk = (e) => {
-                e.preventDefault(); currentMode = 'walking';
-                walkBtn.classList.add('active'); driveBtn.classList.remove('active'); driveBtn.classList.add('bg-gray-50', 'text-gray-400');
-                hud.style.display = 'none';
-            };
-            const handleDrive = (e) => {
-                e.preventDefault(); currentMode = 'driving';
-                driveBtn.classList.add('active'); driveBtn.classList.remove('bg-gray-50', 'text-gray-400');
-                walkBtn.classList.remove('active'); walkBtn.classList.add('bg-gray-50', 'text-gray-400');
-                hud.style.display = 'flex';
-            };
+            const handleWalk = (e) => { e.preventDefault(); currentMode = 'walking'; walkBtn.classList.add('active'); driveBtn.classList.remove('active'); driveBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'none'; };
+            const handleDrive = (e) => { e.preventDefault(); currentMode = 'driving'; driveBtn.classList.add('active'); driveBtn.classList.remove('bg-gray-50', 'text-gray-400'); walkBtn.classList.remove('active'); walkBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'flex'; };
 
             walkBtn.addEventListener('click', handleWalk);
             walkBtn.addEventListener('touchend', handleWalk);
@@ -565,38 +579,16 @@
                 lucide.createIcons();
             };
 
-            // ★音声認識の修正
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr) {
                 const rec = new sr(); rec.lang = 'ja-JP'; 
-                
-                // 状態管理イベント
                 rec.onstart = () => { isSpeechRecognizing = true; document.getElementById('ai-mic-btn').classList.add('recording'); showToast("🎙️ 聞いてるで！"); };
                 rec.onend = () => { isSpeechRecognizing = false; document.getElementById('ai-mic-btn').classList.remove('recording'); };
                 rec.onerror = () => { isSpeechRecognizing = false; document.getElementById('ai-mic-btn').classList.remove('recording'); };
-                
                 rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
-
                 const micBtn = document.getElementById('ai-mic-btn');
-                const handleMic = (e) => { 
-                    if (e) e.preventDefault();
-                    if (isSpeechRecognizing) return; // すでに動いてたら何もしない
-                    
-                    unlockAudio(); 
-                    try { 
-                        rec.start(); 
-                    } catch(err) { 
-                        // 万が一のためのフェイルセーフ
-                        console.log("Recognition start failed safely.");
-                    } 
-                };
-                
-                // スマホとPC両方の対応
-                micBtn.addEventListener('click', (e) => {
-                    // touchendで処理済みの場合はclickを無視
-                    if (e.pointerType === "touch") return; 
-                    handleMic(e);
-                });
+                const handleMic = (e) => { if (e) e.preventDefault(); if (isSpeechRecognizing) return; unlockAudio(); try { rec.start(); } catch(err) {} };
+                micBtn.addEventListener('click', (e) => { if (e.pointerType === "touch") return; handleMic(e); });
                 micBtn.addEventListener('touchend', handleMic);
             }
 
