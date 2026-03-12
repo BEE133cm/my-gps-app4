@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.29 (AI Model Auto-Selector)</title>
+    <title>GPS Tracker Pro v17.30 (Quota & Model Fix)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.29</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.30</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -199,7 +199,13 @@
                 </div>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300">
                 <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存して有効化</button>
-                <div id="ai-error-detail" class="text-[10px] text-red-400 font-mono hidden"></div>
+                <div id="ai-error-detail" class="text-[9px] text-red-400 font-mono hidden bg-red-50 p-2 rounded leading-tight"></div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">APIの制限について</h3>
+                <p class="text-[10px] text-gray-500 leading-relaxed">
+                    無料のAPIキーには「1分間に20回まで」の利用制限があります。会話エラーが出た場合は、10秒ほど待ってからもう一度試してみてな！
+                </p>
             </div>
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス設定</h3>
@@ -239,7 +245,7 @@
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
         let isSpeechRecognizing = false;
 
-        // ★使用可能なモデルを動的に判定
+        // ★修正：Flashモデルをデフォルトに設定
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function updateNetworkStatus() {
@@ -290,7 +296,7 @@
             } catch (e) { console.error(e); }
         };
 
-        // ★AI接続テストの安定化と自動選別
+        // ★修正ポイント：AI接続テストの安定化と自動選別 (Flash優先)
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
             const errorDetail = document.getElementById('ai-error-detail');
@@ -304,12 +310,11 @@
             
             badge.textContent = "検証中..."; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-500";
             
-            // 試行するモデルの優先順リスト
             const modelsToTry = [
-                "gemini-2.5-flash-preview-09-2025",
-                "gemini-2.0-flash",
                 "gemini-1.5-flash",
-                "gemini-1.5-pro"
+                "gemini-2.0-flash-exp",
+                "gemini-1.5-pro",
+                "gemini-1.0-pro"
             ];
 
             let lastResult = null;
@@ -327,24 +332,19 @@
                         badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
                         return;
                     }
-                    
                     const err = await resp.json();
-                    lastResult = { status: resp.status, message: err.error?.message || "Unknown error" };
-                    
-                    // キーが無効な場合は即座に終了（他のモデルを試しても無駄なため）
-                    if (resp.status === 403) break;
-                    
+                    lastResult = { status: resp.status, message: err.error?.message || "不明なエラー" };
+                    if (resp.status === 403) break; // キー自体が無効
                 } catch (e) {
-                    lastResult = { status: "Network", message: e.message };
+                    lastResult = { status: "Network", message: "ネットワークに繋がらへんわ" };
                 }
             }
 
-            // 全て失敗した場合
             if (lastResult.status === 403) badge.textContent = "キー無効(403)";
             else if (lastResult.status === 429) badge.textContent = "制限中(429)";
             else badge.textContent = `エラー(${lastResult.status})`;
             
-            errorDetail.textContent = lastResult.message;
+            errorDetail.innerHTML = `理由: ${lastResult.message}<br><span class='text-[8px] opacity-70'>※無料版は1分間に20回までの制限があります。</span>`;
             errorDetail.classList.remove('hidden');
             badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
         }
@@ -352,20 +352,36 @@
         async function apiFetch(url, body, retries = 3) {
             const key = localStorage.getItem('GEMINI_API_KEY')?.trim() || "";
             if (!key) { showToast("AIキーを設定してな！", true); throw new Error("KEY_MISSING"); }
+            
             let delay = 1000;
             for (let i = 0; i < retries; i++) {
                 try {
-                    const resp = await fetch(`${url}?key=${key}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-                    if (!resp.ok) {
-                        const err = await resp.json();
-                        if (resp.status === 403) throw new Error("INVALID_KEY");
-                        if (resp.status === 429) throw new Error("QUOTA_EXCEEDED");
-                        throw new Error(err.error?.message || "API_ERROR");
+                    const resp = await fetch(`${url}?key=${key}`, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(body) 
+                    });
+                    
+                    if (resp.ok) return await resp.json();
+                    
+                    const err = await resp.json();
+                    if (resp.status === 429) {
+                        // 制限オーバー：指数バックオフで待機
+                        if (i < retries - 1) {
+                            showToast(`混雑中やわ、${Math.ceil(delay/1000)}秒後にやり直すな...`);
+                            await new Promise(r => setTimeout(r, delay));
+                            delay *= 2;
+                            continue;
+                        }
+                        throw new Error("QUOTA_EXCEEDED");
                     }
-                    return await resp.json();
+                    if (resp.status === 403) throw new Error("INVALID_KEY");
+                    throw new Error(err.error?.message || "API_ERROR");
+                    
                 } catch (err) {
                     if (err.message === "INVALID_KEY" || err.message === "QUOTA_EXCEEDED" || i === retries - 1) throw err;
-                    await new Promise(r => setTimeout(r, delay)); delay *= 2;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
                 }
             }
         }
@@ -373,8 +389,10 @@
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
             showToast(`ゆーみん: 「${prompt}」`);
-            isAIThinking = true; chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            isAIThinking = true; 
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
+            
             try {
                 const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーみん」です。現在地: ${lastAddress}。3行以内で返答。`;
                 const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
@@ -384,9 +402,9 @@
                 if (txt) { chatHistory.push({ role: "model", parts: [{ text: txt }] }); speakText(txt); }
             } catch (err) {
                 chatHistory.pop();
-                if (err.message === "INVALID_KEY") showToast("キーが違うみたいやわ。", true);
-                else if (err.message === "QUOTA_EXCEEDED") showToast("ちょっと休憩中や、また後でな！", true);
-                else showToast("通信エラーやわ…", true);
+                if (err.message === "INVALID_KEY") showToast("APIキーが間違ってるみたい。確認してみて！", true);
+                else if (err.message === "QUOTA_EXCEEDED") showToast("1分間の制限を超えたわ。ちょっと待ってな！", true);
+                else showToast("通信エラーやわ…電波いいかな？", true);
             } finally { isAIThinking = false; }
         }
 
@@ -396,14 +414,16 @@
             document.getElementById('ai-chat-bubble').style.display = 'block';
             if (bubbleTimer) clearTimeout(bubbleTimer);
             bubbleTimer = setTimeout(() => { document.getElementById('ai-chat-bubble').style.display = 'none'; }, Math.max(3000, txt.length * 200));
+            
             try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
+                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, { 
                     contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], 
                     generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } 
                 });
                 const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
                 if (pcm) { playAudio(pcm); return; }
             } catch(e) {}
+            
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
