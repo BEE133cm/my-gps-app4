@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.34 (Auto ListModels Fetch)</title>
+    <title>GPS Tracker Pro v17.35 (Fast AI Status)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.34</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.35</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -299,22 +299,33 @@
             } catch (e) { console.error(e); }
         };
 
-        // ★究極の解決策：ListModels APIを使って、キーで許可されたモデルをGoogleから直接聞く
+        // ★修正ポイント：保存済みの状態を画面を開いた時に素早く表示する
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
             const errorDetail = document.getElementById('ai-error-detail');
             const key = (manualKey !== undefined ? manualKey : localStorage.getItem('GEMINI_API_KEY'))?.trim();
+            const storedStatus = localStorage.getItem('AI_CONNECTION_STATUS');
+            const storedModel = localStorage.getItem('AI_WORKING_MODEL');
             
             errorDetail.classList.add('hidden');
             if (!key) {
                 badge.textContent = "未設定"; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400";
                 return;
             }
+
+            // manualKeyがない（＝画面を開いただけ）場合、過去の成功の記憶があればスキップ
+            if (manualKey === undefined && storedStatus === 'SUCCESS' && storedModel) {
+                badge.textContent = "準備完了！";
+                errorDetail.innerHTML = `✅ <b>接続済み！</b><br>現在のAI: <code>${storedModel}</code>`;
+                errorDetail.className = "text-[10px] text-green-700 font-mono mt-2 bg-green-50 p-3 rounded-lg leading-tight";
+                errorDetail.classList.remove('hidden');
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
+                return;
+            }
             
             badge.textContent = "検証中..."; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-500";
             
             try {
-                // 1. まずListModelsで「使えるモデル」のリストを取得する
                 const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
                 
                 if (!listResp.ok) {
@@ -324,7 +335,6 @@
                 
                 const listData = await listResp.json();
                 
-                // generateContentが使えるGeminiモデルだけを抽出
                 const availableModels = listData.models.filter(m => 
                     m.supportedGenerationMethods && 
                     m.supportedGenerationMethods.includes("generateContent") &&
@@ -333,34 +343,34 @@
                 
                 if (availableModels.length === 0) throw new Error("NO_MODELS");
                 
-                // 一番優秀で安定しているモデルを自動選別 (1.5-flash優先)
                 let bestModel = availableModels.find(m => m.name.includes("1.5-flash")) || 
                                 availableModels.find(m => m.name.includes("pro")) || 
                                 availableModels[0];
                                 
-                // "models/gemini-1.5-flash" のような形式なので、"models/" を切り取る
                 currentWorkingModel = bestModel.name.replace("models/", "");
                 localStorage.setItem('AI_WORKING_MODEL', currentWorkingModel);
                 
-                // 2. 選んだモデルで通信テスト
                 const pingResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent?key=${key}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] })
                 });
                 
-                if (pingResp.ok) {
-                    badge.textContent = "準備完了！";
-                    errorDetail.innerHTML = `✅ <b>接続成功！</b><br>ゆーみんのキーに最適なAI（<code>${currentWorkingModel}</code>）を自動設定したで！`;
-                    errorDetail.className = "text-[10px] text-green-700 font-mono mt-2 bg-green-50 p-3 rounded-lg leading-tight";
+                if (pingResp.ok || pingResp.status === 429) {
+                    // ★接続成功の記憶を保存
+                    localStorage.setItem('AI_CONNECTION_STATUS', 'SUCCESS');
+                    
+                    if (pingResp.ok) {
+                        badge.textContent = "準備完了！";
+                        errorDetail.innerHTML = `✅ <b>接続成功！</b><br>ゆーみんのキーに最適なAI（<code>${currentWorkingModel}</code>）を設定したで！`;
+                        errorDetail.className = "text-[10px] text-green-700 font-mono mt-2 bg-green-50 p-3 rounded-lg leading-tight";
+                        badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
+                    } else {
+                        badge.textContent = "準備完了(制限中)";
+                        errorDetail.innerHTML = `✅ <b>AI設定完了（<code>${currentWorkingModel}</code>）！</b><br>今はAPIの利用制限（1分間15回）中やから、ちょっと待ってから話しかけてな！`;
+                        errorDetail.className = "text-[10px] text-yellow-700 font-mono mt-2 bg-yellow-50 p-3 rounded-lg leading-tight";
+                        badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-600";
+                    }
                     errorDetail.classList.remove('hidden');
-                    badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
-                    return;
-                } else if (pingResp.status === 429) {
-                    badge.textContent = "準備完了(制限中)";
-                    errorDetail.innerHTML = `✅ <b>AI自動設定完了（<code>${currentWorkingModel}</code>）！</b><br>今はAPIの利用制限（1分間15回）中やから、ちょっと待ってから話しかけてな！`;
-                    errorDetail.className = "text-[10px] text-yellow-700 font-mono mt-2 bg-yellow-50 p-3 rounded-lg leading-tight";
-                    errorDetail.classList.remove('hidden');
-                    badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-600";
                     return;
                 } else {
                     const err = await pingResp.json();
@@ -368,6 +378,9 @@
                 }
                 
             } catch (e) {
+                // ★失敗したら記憶を消す
+                localStorage.removeItem('AI_CONNECTION_STATUS');
+                
                 errorDetail.className = "text-[10px] text-red-500 font-mono mt-2 bg-red-50 p-3 rounded-lg leading-tight";
                 if (e.message === "INVALID_KEY") {
                     badge.textContent = "キー無効(403)";
@@ -521,7 +534,11 @@
             const target = document.getElementById(id);
             if (target) {
                 target.classList.add('active');
-                if (id === 'settings-view') { document.getElementById('api-key-input').value = localStorage.getItem('GEMINI_API_KEY') || ""; testAIConnection(); }
+                if (id === 'settings-view') { 
+                    document.getElementById('api-key-input').value = localStorage.getItem('GEMINI_API_KEY') || ""; 
+                    // 引数なしで呼ぶと、保存済みの記憶を使って高速判定する
+                    testAIConnection(); 
+                }
                 if (id === 'map-overlay' && map) setTimeout(() => { map.invalidateSize(); if(currentPos) map.panTo(currentPos); updateOrbisMarkers(); }, 200);
                 if (id === 'detail-view' && detailMap) setTimeout(() => { detailMap.invalidateSize(); }, 200);
                 lucide.createIcons();
@@ -582,6 +599,7 @@
             document.getElementById('save-key-btn').onclick = async () => { 
                 const key = document.getElementById('api-key-input').value.trim(); 
                 localStorage.setItem('GEMINI_API_KEY', key); 
+                // ★明示的にキーを渡すと、記憶をリセットして再検証する
                 showToast("保存完了！AIを確認するわな..."); 
                 await testAIConnection(key);
             };
