@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.31 (API Validation Fix)</title>
+    <title>GPS Tracker Pro v17.32 (Ultimate Stable AI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.31</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.32</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -199,7 +199,14 @@
                 </div>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-pink-300">
                 <button id="save-key-btn" class="w-full bg-pink-500 text-white font-bold py-3 rounded-xl text-sm shadow-sm active:scale-95 transition-all">キーを保存して有効化</button>
-                <div id="ai-error-detail" class="text-[10px] text-gray-600 font-mono hidden bg-pink-50 p-3 rounded-lg leading-tight"></div>
+                <div id="ai-error-detail" class="text-[9px] text-gray-600 font-mono hidden bg-pink-50 p-3 rounded-lg leading-tight"></div>
+            </div>
+            
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">APIの制限について</h3>
+                <p class="text-[10px] text-gray-500 leading-relaxed">
+                    無料版は「1分間に15回まで」の制限があります。エラーが出たら10秒待ってな！
+                </p>
             </div>
             
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
@@ -240,6 +247,7 @@
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
         let isSpeechRecognizing = false;
 
+        // ★修正ポイント：安定版のモデルに完全に固定する
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function updateNetworkStatus() {
@@ -290,7 +298,7 @@
             } catch (e) { console.error(e); }
         };
 
-        // ★修正ポイント：検証ロジックで429エラーを正しく検知してブレイクする
+        // ★修正ポイント：安定版モデルの1.5-flashだけに絞って検証する
         async function testAIConnection(manualKey) {
             const badge = document.getElementById('ai-status-badge');
             const errorDetail = document.getElementById('ai-error-detail');
@@ -304,9 +312,10 @@
             
             badge.textContent = "検証中..."; badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-500";
             
+            // 確実に使えるモデルリスト
             const modelsToTry = [
                 "gemini-1.5-flash",
-                "gemini-2.0-flash"
+                "gemini-1.5-flash-8b"
             ];
 
             let lastResult = null;
@@ -329,7 +338,7 @@
                     
                     if (resp.status === 403) break; // キー自体が無効
                     if (resp.status === 429) {
-                        // 制限に引っかかった＝キーとモデルは正解なのでここで確定させる！
+                        // 429(制限)が出るということは、キーもモデルも合っている証拠
                         currentWorkingModel = model;
                         localStorage.setItem('AI_WORKING_MODEL', model);
                         break;
@@ -345,8 +354,9 @@
                 errorDetail.innerHTML = `キーが間違ってるか無効みたいやわ。<br>もう一回コピーし直してみてな！`;
                 badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-500";
             } else if (lastResult.status === 429) {
-                badge.textContent = "制限中(429)";
-                errorDetail.innerHTML = `キーは合ってるけど、今は<b>利用制限（1分間に15回まで）</b>に引っかかってるわ！<br>1分くらい待ってから話しかけてみてな。`;
+                // 制限中なだけで、準備は完了しているとみなす
+                badge.textContent = "準備完了(制限中)";
+                errorDetail.innerHTML = `キーの接続は成功や！<br>ただ今はAPIの利用制限（1分間15回）に引っかかってるから、1分くらい待ってから話しかけてな！`;
                 badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-600";
             } else {
                 badge.textContent = `エラー(${lastResult.status})`;
@@ -412,6 +422,7 @@
             } finally { isAIThinking = false; }
         }
 
+        // ★修正ポイント：API消費を抑えるため、TTS(音声生成)はブラウザ標準のみを使用する
         async function speakText(txt) {
             if (isMuted) return;
             const resp = document.getElementById('ai-response-text'); if (resp) resp.textContent = txt;
@@ -419,32 +430,15 @@
             if (bubbleTimer) clearTimeout(bubbleTimer);
             bubbleTimer = setTimeout(() => { document.getElementById('ai-chat-bubble').style.display = 'none'; }, Math.max(3000, txt.length * 200));
             
-            try {
-                const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, { 
-                    contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], 
-                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } 
-                });
-                const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (pcm) { playAudio(pcm); return; }
-            } catch(e) {}
-            
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                const u = new SpeechSynthesisUtterance(txt); u.lang = 'ja-JP'; u.volume = voiceVolume;
+                const u = new SpeechSynthesisUtterance(txt); 
+                u.lang = 'ja-JP'; 
+                u.volume = voiceVolume;
+                u.pitch = 1.2; // 少し高くしてさくらっぽく
+                u.rate = 1.1;  // 少し早口で元気よく
                 window.speechSynthesis.speak(u);
             }
-        }
-
-        function playAudio(base64) {
-            const bin = atob(base64), bytes = new Uint8Array(bin.length);
-            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
-            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + bin.length, true); v.setUint32(8, 0x57415645, false);
-            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
-            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
-            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, bin.length, true);
-            const player = document.getElementById('ai-audio-player');
-            if(player) { player.src = URL.createObjectURL(new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' })); player.volume = voiceVolume; player.play().catch(e => console.error(e)); }
         }
 
         async function fetchOrbisData(lat, lng) {
