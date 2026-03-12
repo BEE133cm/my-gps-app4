@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.40 (Smart Orbis & History Fix)</title>
+    <title>GPS Tracker Pro v17.42 (History Merge & DB Rule Check)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.40</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.42</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -210,6 +210,7 @@
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
             
+            <!-- アカウント設定＆Googleログイン -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント (データ保存用)</h3>
                 
@@ -281,10 +282,8 @@
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
         let isSpeechRecognizing = false;
 
-        // ★進行方向の保持用変数
         let currentHeading = 0;
         let lastPosForHeading = null;
-
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function updateNetworkStatus() {
@@ -539,7 +538,6 @@
             lucide.createIcons();
         }
 
-        // ★修正：2点間の方位角を計算する関数（北を0度として時計回り）
         function getBearing(lat1, lng1, lat2, lng2) {
             const toRad = Math.PI / 180;
             const toDeg = 180 / Math.PI;
@@ -550,7 +548,6 @@
             return (brng + 360) % 360;
         }
 
-        // ★修正：スマートオービス判定（進行方向から前方60度以内のみ反応）
         function checkOrbis(lat, lng) {
             if (ORBIS_LIST.length === 0) return;
             let targetZone = 0;
@@ -558,13 +555,11 @@
             ORBIS_LIST.forEach(orb => { 
                 const d = getDistance(lat, lng, orb.lat, orb.lng); 
                 if (d <= 1000) {
-                    // 現在の進行方向と、オービスがある方向の「角度の差」を計算
                     const bearingToOrbis = getBearing(lat, lng, orb.lat, orb.lng);
                     let angleDiff = bearingToOrbis - currentHeading;
                     angleDiff = (angleDiff + 180) % 360 - 180;
                     if (angleDiff <= -180) angleDiff += 360;
                     
-                    // 前方 ±60度 の範囲内にあるオービスだけに反応する
                     if (Math.abs(angleDiff) <= 60 || currentHeading === 0) {
                         let z = (d <= 200) ? 3 : (d <= 500) ? 2 : 1;
                         if (z > targetZone) targetZone = z;
@@ -601,11 +596,9 @@
         function updateLocation(pos) {
             const { latitude: lat, longitude: lng, accuracy, speed, heading } = pos.coords;
             
-            // ★進行方向の更新
             if (heading !== null && !isNaN(heading)) {
                 currentHeading = heading;
             } else if (lastPosForHeading) {
-                // 過去の点から自分で計算する（2m以上移動した場合）
                 const d = getDistance(lastPosForHeading.lat, lastPosForHeading.lng, lat, lng);
                 if (d > 2) {
                     currentHeading = getBearing(lastPosForHeading.lat, lastPosForHeading.lng, lat, lng);
@@ -617,7 +610,7 @@
             document.getElementById('address-display').classList.remove('text-red-500'); 
             
             fetchOrbisData(lat, lng); 
-            checkOrbis(lat, lng); // ★スマートオービス判定実行
+            checkOrbis(lat, lng); 
             updateAddress(lat, lng);
             
             const accEl = document.getElementById('gps-accuracy');
@@ -660,17 +653,43 @@
             const t = document.getElementById('toast'); if (t) { t.textContent = msg; t.style.display = 'block'; t.style.backgroundColor = isError ? '#ef4444' : '#000'; setTimeout(() => { if (t.textContent === msg) t.style.display = 'none'; }, 5000); }
         }
 
-        // ★修正ポイント：履歴データの保存先を「プライベート領域（users/{userId}）」に変更して確実に見れるようにした
+        // ★修正ポイント：過去のデータ(パブリック)と今のデータ(プライベート)を両方読み込んで合体する
         async function loadHistory() {
-            if (!user || !db) return; const listEl = document.getElementById('history-list'); if (!listEl) return;
+            if (!user || !db) return; 
+            const listEl = document.getElementById('history-list'); 
+            if (!listEl) return;
+            
             try {
-                // Rule 1対応: private path
-                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'));
-                const querySnapshot = await getDocs(q);
-                let items = []; querySnapshot.forEach((doc) => { items.push({ id: doc.id, ...doc.data() }); });
-                items.sort((a,b) => b.startTime - a.startTime);
-                listEl.innerHTML = items.length ? '' : '<p class="text-center text-gray-400 mt-10">記録がまだあらへんわ。</p>';
-                items.forEach(item => {
+                let items = []; 
+                
+                // 1. 古いパブリックデータ（過去の記録）を捜索
+                try {
+                    const qPub = query(collection(db, 'artifacts', appId, 'public', 'data', 'routes'));
+                    const snapPub = await getDocs(qPub);
+                    snapPub.forEach(doc => { 
+                        const data = doc.data(); 
+                        if(data.userId === user.uid) items.push({ id: doc.id, ...data }); 
+                    });
+                } catch(e) { console.warn("古いデータの読み込みスキップ:", e); }
+
+                // 2. 新しいプライベートデータ（今の記録）を捜索
+                try {
+                    const qPriv = query(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'));
+                    const snapPriv = await getDocs(qPriv);
+                    snapPriv.forEach(doc => { 
+                        items.push({ id: doc.id, ...doc.data() }); 
+                    });
+                } catch(e) { console.warn("新しいデータの読み込みスキップ:", e); }
+
+                // もし同じデータが混ざってたら省く（IDで判定）
+                const uniqueItems = Array.from(new Map(items.map(item => [item.id, item])).values());
+
+                // 時間が新しい順に並べ替え
+                uniqueItems.sort((a,b) => b.startTime - a.startTime);
+                
+                listEl.innerHTML = uniqueItems.length ? '' : '<p class="text-center text-gray-400 mt-10">記録がまだあらへんわ。</p>';
+                
+                uniqueItems.forEach(item => {
                     const div = document.createElement('div');
                     div.className = "history-item bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 active:scale-95 transition-all";
                     div.innerHTML = `<div class="bg-pink-100 p-3 rounded-full text-pink-500 shrink-0"><i data-lucide="${item.mode==='walking'?'footprints':'car'}"></i></div><div class="flex-grow"><p class="font-bold text-sm">${new Date(item.startTime).toLocaleString('ja-JP')}</p><p class="text-[10px] text-gray-400">距離: ${(item.distance/1000).toFixed(2)} km</p></div><i data-lucide="chevron-right" class="text-gray-300"></i>`;
@@ -679,6 +698,7 @@
                 lucide.createIcons();
             } catch (e) {
                 console.error("履歴の読み込みに失敗:", e);
+                showToast("履歴の読み込みに失敗したわ…ルールの期限切れかも？", true);
             }
         }
 
@@ -746,7 +766,7 @@
 
             document.getElementById('stop-nav-btn').onclick = () => hud.style.display = 'none';
 
-            // ★修正ポイント：記録停止時の確認モーダルとプライベート保存の徹底
+            // ★修正ポイント：保存失敗時のエラーメッセージを具体的にして原因を知らせる
             const confirmModal = document.getElementById('confirm-modal');
             const toggleBtn = document.getElementById('record-toggle-btn');
             const toggleText = document.getElementById('btn-text'); 
@@ -754,7 +774,6 @@
 
             toggleBtn.onclick = () => {
                 if (!isTracking) { 
-                    // 開始は誰でもすぐできる
                     isTracking = true;
                     startTime = Date.now(); totalDistance = 0; historyPoints = []; 
                     if(polyline) polyline.setLatLngs([]); 
@@ -764,7 +783,6 @@
                     toggleIcon.setAttribute('data-lucide', 'square'); 
                     lucide.createIcons();
                 } else { 
-                    // 停止は確認画面を出す
                     confirmModal.classList.remove('hidden');
                 }
             };
@@ -786,13 +804,12 @@
                     showToast("ログインしてへんから保存できんかったわ…ごめん！", true); 
                 } else {
                     try { 
-                        // ★保存先を確実にユーザー専用の場所に指定
                         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'), { userId: user.uid, mode: currentMode, distance: totalDistance, startTime: startTime, endTime: Date.now(), points: JSON.stringify(historyPoints) }); 
                         showToast("記録を保存したで！履歴から見てみてな！");
                         loadHistory(); 
                     } catch (err) { 
-                        console.error(err);
-                        showToast("保存に失敗したわ…", true); 
+                        console.error("Save Error:", err);
+                        showToast("保存失敗: データベースルールの期限切れ（テストモード）の可能性が高いわ！設定確認してみてな！", true); 
                     }
                 }
             };
