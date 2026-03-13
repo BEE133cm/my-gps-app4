@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.43 (Direct Result View)</title>
+    <title>GPS Tracker Pro v17.50 (Galge Dialog UI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,24 +24,76 @@
         .mode-btn i { pointer-events: none; }
         .mode-btn.active { background-color: #ec4899 !important; color: white !important; box-shadow: 0 4px 15px rgba(236, 72, 153, 0.4); }
         
-        #ai-container { position: fixed; bottom: 100px; left: 20px; width: auto; max-width: 280px; display: flex; align-items: flex-end; gap: 12px; z-index: 80; pointer-events: none; }
-        #ai-avatar { width: 64px; height: 64px; min-width: 64px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background-color: #fdf2f8; overflow: hidden; pointer-events: auto; }
-        #ai-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        #ai-chat-bubble { background: white; padding: 12px 16px; border-radius: 20px 20px 20px 4px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: none; pointer-events: auto; border-left: 4px solid #ec4899; }
-        
         #nav-hud { display: none; background: rgba(30, 41, 59, 0.95); color: white; padding: 16px; border-radius: 20px; margin-bottom: 4px; z-index: 40; }
         
         .custom-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.9); color: white; padding: 12px 20px; border-radius: 12px; z-index: 9999; display: none; font-size: 13px; width: 85%; max-width: 400px; text-align: center; }
-        .recording { border: 4px solid #ec4899 !important; background-color: #fce7f3 !important; box-shadow: 0 0 20px rgba(236, 72, 153, 0.5) !important; }
         
-        #orbis-flash-overlay { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: none; mix-blend-mode: soft-light; }
-        @keyframes flash-blue { 0%, 100% { background: rgba(191, 219, 254, 0); } 50% { background: rgba(191, 219, 254, 0.5); } }
-        @keyframes flash-yellow { 0%, 100% { background: rgba(253, 224, 71, 0); } 50% { background: rgba(253, 224, 71, 0.6); } }
-        @keyframes flash-red { 0%, 100% { background: rgba(239, 68, 68, 0); } 50% { background: rgba(239, 68, 68, 0.7); } }
-        .flash-blue { display: block !important; animation: flash-blue 1.5s infinite; }
-        .flash-yellow { display: block !important; animation: flash-yellow 1s infinite; }
-        .flash-red { display: block !important; animation: flash-red 0.5s infinite; }
+        #orbis-flash-overlay { position: fixed; inset: 0; z-index: 9999; pointer-events: none; display: none; box-sizing: border-box; }
+        @keyframes flash-blue { 0%, 100% { background: rgba(59, 130, 246, 0); border: 0px solid rgba(59, 130, 246, 0); } 50% { background: rgba(59, 130, 246, 0.4); border: 12px solid rgba(59, 130, 246, 0.8); } }
+        @keyframes flash-yellow { 0%, 100% { background: rgba(234, 179, 8, 0); border: 0px solid rgba(234, 179, 8, 0); } 50% { background: rgba(234, 179, 8, 0.5); border: 16px solid rgba(234, 179, 8, 0.9); } }
+        @keyframes flash-red { 0%, 100% { background: rgba(239, 68, 68, 0); border: 0px solid rgba(239, 68, 68, 0); } 50% { background: rgba(239, 68, 68, 0.6); border: 20px solid rgba(239, 68, 68, 1); } }
+        .flash-blue { display: block !important; animation: flash-blue 0.8s infinite; }
+        .flash-yellow { display: block !important; animation: flash-yellow 0.5s infinite; }
+        .flash-red { display: block !important; animation: flash-red 0.25s infinite; }
         .orbis-marker { background: #ef4444; color: white; border: 2px solid white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+
+        /* ★新規追加：ギャルゲー風セリフ枠の録音アニメーション */
+        @keyframes pulse-mic {
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); border-color: #ec4899; background-color: #fdf2f8; }
+            70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); border-color: #fbcfe8; background-color: #fff; }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); border-color: #ec4899; background-color: #fdf2f8; }
+        }
+        #ai-dialog-box.listening {
+            animation: pulse-mic 1.5s infinite;
+        }
+
+        /* ドライブモード（ダーク＆ネオンブルー）のスタイル */
+        body.driving-mode { background-color: #0f172a !important; color: #f8fafc !important; }
+        .driving-mode .view-screen { background-color: #0f172a !important; }
+        .driving-mode .bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #f8fafc !important; }
+        .driving-mode .text-gray-800 { color: #f8fafc !important; }
+        .driving-mode .text-gray-700 { color: #e2e8f0 !important; }
+        .driving-mode .text-gray-600 { color: #cbd5e1 !important; }
+        .driving-mode .text-gray-400 { color: #94a3b8 !important; }
+        .driving-mode .bg-gray-50, .driving-mode .bg-gray-100 { background-color: #334155 !important; }
+        .driving-mode .border-gray-100, .driving-mode .border-gray-200 { border-color: #475569 !important; }
+        
+        .driving-mode .text-pink-600 { color: #22d3ee !important; text-shadow: 0 0 10px rgba(34, 211, 238, 0.5); }
+        .driving-mode .text-pink-500 { color: #06b6d4 !important; text-shadow: 0 0 8px rgba(6, 182, 212, 0.4); }
+        .driving-mode .bg-pink-500, .driving-mode .bg-pink-600 { background-color: #06b6d4 !important; color: #0f172a !important; box-shadow: 0 0 15px rgba(6, 182, 212, 0.6) !important; font-weight: 900; }
+        .driving-mode .border-pink-500 { border-color: #06b6d4 !important; box-shadow: 0 0 10px rgba(6, 182, 212, 0.3), inset 0 0 10px rgba(6, 182, 212, 0.3) !important; }
+        .driving-mode .bg-pink-100 { background-color: rgba(6, 182, 212, 0.2) !important; color: #22d3ee !important; }
+        
+        .driving-mode .text-blue-500 { color: #60a5fa !important; text-shadow: 0 0 10px rgba(96, 165, 250, 0.6); }
+        .driving-mode .text-purple-500 { color: #c084fc !important; text-shadow: 0 0 10px rgba(192, 132, 252, 0.6); }
+        .driving-mode .text-orange-500 { color: #fb923c !important; text-shadow: 0 0 10px rgba(251, 146, 60, 0.6); }
+        .driving-mode .bg-green-500 { background-color: #10b981 !important; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4) !important; color: #0f172a !important; }
+        .driving-mode .bg-red-500 { background-color: #ef4444 !important; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important; color: #f8fafc !important; }
+
+        .driving-mode .stat-card {
+            background-color: #1e293b !important;
+            border: 1px solid #334155;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .driving-mode .leaflet-layer, .driving-mode .leaflet-control-zoom-in, .driving-mode .leaflet-control-zoom-out, .driving-mode .leaflet-control-attribution { filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%); }
+        
+        .driving-mode .mode-btn:not(.active) { background-color: #0f172a !important; color: #64748b !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        .mode-btn:not(.active) { box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+
+        /* ★新規追加：ダークモード用ギャルゲー枠アニメーション */
+        @keyframes pulse-mic-dark {
+            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); border-color: #06b6d4; background-color: rgba(6, 182, 212, 0.2); }
+            70% { box-shadow: 0 0 0 10px rgba(6, 182, 212, 0); border-color: #22d3ee; background-color: rgba(30, 41, 59, 0.95); }
+            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); border-color: #06b6d4; background-color: rgba(6, 182, 212, 0.2); }
+        }
+        .driving-mode #ai-dialog-box {
+            background-color: rgba(30, 41, 59, 0.95) !important;
+            border-color: #334155 !important;
+        }
+        .driving-mode #ai-dialog-box.listening {
+            animation: pulse-mic-dark 1.5s infinite;
+        }
     </style>
 </head>
 <body class="font-sans text-gray-800">
@@ -52,7 +104,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.43</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.50</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -66,12 +118,6 @@
             <button id="mode-driving" class="mode-btn flex items-center justify-center gap-2 py-4 rounded-xl font-black text-sm transition-all bg-gray-50 text-gray-400">
                 <i data-lucide="car" class="w-4 h-4"></i> ドライブ
             </button>
-        </div>
-
-        <div id="nav-hud" class="flex items-center gap-4 shrink-0 shadow-lg">
-            <div class="bg-pink-500 p-2.5 rounded-full text-white shadow-md"><i data-lucide="corner-up-right" class="w-6 h-6"></i></div>
-            <div class="flex-grow"><p class="font-bold text-sm text-white">ドライブ中</p></div>
-            <button id="stop-nav-btn" class="text-xs font-bold text-red-400 px-3 py-2 border border-red-400/30 rounded active:bg-red-400/20">停止</button>
         </div>
 
         <div id="location-card" class="bg-white p-4 rounded-2xl shadow-sm border-l-4 border-pink-500 flex flex-col gap-2">
@@ -112,6 +158,22 @@
             <button id="record-toggle-btn" class="w-full bg-green-500 text-white font-black py-6 rounded-3xl shadow-lg text-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
                 <i data-lucide="play" id="btn-icon"></i><span id="btn-text">記録開始</span>
             </button>
+
+            <!-- ★新規追加：ギャルゲー風セリフ枠 兼 マイクボタン -->
+            <div id="ai-dialog-box" class="w-full bg-white/95 backdrop-blur-sm border-2 border-pink-200 rounded-2xl shadow-lg p-3 flex gap-3 items-center cursor-pointer transition-all active:scale-[0.98]">
+                <div class="w-14 h-14 rounded-full border-2 border-pink-500 overflow-hidden shrink-0 bg-pink-50 flex items-center justify-center shadow-inner relative">
+                    <img id="ai-image" src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/64/fdf2f8/ec4899?text=Sakura'" class="w-full h-full object-cover">
+                    <!-- マイク録音中アイコン -->
+                    <div id="mic-indicator" class="absolute bottom-0 right-0 bg-pink-500 rounded-full p-0.5 text-white hidden"><i data-lucide="mic" class="w-3 h-3"></i></div>
+                </div>
+                <div class="flex-grow flex flex-col justify-center min-w-0">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[11px] font-black text-pink-500 uppercase tracking-wider">Sakura AI</span>
+                        <span id="ai-status-text" class="text-[9px] font-bold bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">タップで会話</span>
+                    </div>
+                    <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight line-clamp-2">ゆーくん、今日もよろしくな！</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -151,7 +213,6 @@
                     </div>
                 </div>
                 <div id="detail-map" style="height: 280px; border-radius: 12px; background-color: #f3f4f6;" class="mt-2 relative z-0"></div>
-                <!-- ★キャプチャ時だけ現れるオシャレな透かしロゴ -->
                 <div id="watermark" class="absolute bottom-8 right-8 font-black text-pink-600/20 italic text-2xl z-10 pointer-events-none hidden">TRACKER Pro</div>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -173,7 +234,7 @@
         </div>
     </div>
 
-    <!-- ★記録停止の確認モーダル -->
+    <!-- 記録停止の確認モーダル -->
     <div id="confirm-modal" class="fixed inset-0 bg-black/60 z-[9999] hidden flex items-center justify-center">
         <div class="bg-white p-6 rounded-3xl w-80 max-w-[90%] shadow-2xl transform transition-all">
             <div class="flex flex-col items-center gap-3">
@@ -189,19 +250,6 @@
             </div>
         </div>
     </div>
-
-    <!-- AIキャラクター -->
-    <div id="ai-container">
-        <div id="ai-avatar"><img id="ai-image" src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/64/fdf2f8/ec4899?text=Sakura'"></div>
-        <div id="ai-chat-bubble">
-            <p class="text-[10px] font-bold text-pink-500 uppercase mb-1">SAKURA</p>
-            <p id="ai-response-text" class="text-sm font-bold text-gray-700 leading-tight">ゆーくん、今日もよろしくな！</p>
-        </div>
-    </div>
-
-    <button id="ai-mic-btn" style="z-index: 120;" class="fixed bottom-10 right-6 w-16 h-16 bg-pink-600 rounded-full shadow-2xl flex items-center justify-center text-white active:scale-95 transition-all">
-        <i data-lucide="mic" id="mic-icon" class="w-8 h-8"></i>
-    </button>
 
     <!-- 設定画面 -->
     <div id="settings-view" class="view-screen">
@@ -247,11 +295,31 @@
             
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">さくらボイス設定</h3>
+                
+                <div class="flex items-center justify-between border-b border-gray-50 pb-4">
+                    <div>
+                        <p class="font-bold text-sm text-gray-800">超リアルボイス <span class="text-[10px] bg-pink-100 text-pink-500 px-2 py-0.5 rounded-full ml-1">Beta</span></p>
+                        <p class="text-[10px] text-gray-400 mt-1">※APIを2回消費します。制限エラー時はOFFに！</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="real-voice-toggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500"></div>
+                    </label>
+                </div>
+
                 <div class="flex items-center gap-4">
                     <button id="mute-toggle-btn" class="bg-gray-100 p-3 rounded-xl text-gray-600"><i data-lucide="volume-2" id="mute-icon"></i></button>
                     <div class="flex-grow"><input type="range" id="volume-slider" min="0" max="100" class="w-full accent-pink-500"></div>
                 </div>
             </div>
+            
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">APIの制限について</h3>
+                <p class="text-[10px] text-gray-500 leading-relaxed">
+                    無料版は「1分間に15回まで」の制限があります。エラーが出たら10秒待ってな！
+                </p>
+            </div>
+            
             <div id="user-status-area" class="text-center p-2 hidden"><p id="user-id-display" class="text-[10px] text-gray-400 break-all"></p></div>
         </div>
     </div>
@@ -278,16 +346,17 @@
         let isTracking = false, startTime = null, totalDistance = 0, historyPoints = [];
         let voiceVolume = parseFloat(localStorage.getItem('voiceVolume')) || 1.0;
         let isMuted = localStorage.getItem('isMuted') === 'true';
+        let useRealVoice = localStorage.getItem('useRealVoice') === 'true';
+        
         let lastAddress = "住所取得中...", currentMode = 'walking', isAIThinking = false;
         let lastAddressFetchTime = 0, bubbleTimer = null, chatHistory = [], audioUnlocked = false;
         let ORBIS_LIST = [], currentOrbisZone = 0, orbisMarkers = [], lastOrbisFetchTime = 0;
+        let TRAFFIC_LIST = [], currentTrafficZone = 0, trafficMarkers = [], lastTrafficFetchTime = 0;
         let isSpeechRecognizing = false;
 
         let currentHeading = 0;
         let lastPosForHeading = null;
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
-
-        // ★戻るボタン用の画面履歴
         let previousView = 'main-view';
 
         function updateNetworkStatus() {
@@ -317,6 +386,11 @@
 
         function unlockAudio() {
             if (audioUnlocked) return;
+            const player = document.getElementById('ai-audio-player');
+            if(player) { 
+                player.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"; 
+                player.play().catch(() => {}); 
+            }
             if ('speechSynthesis' in window) {
                 const u = new SpeechSynthesisUtterance('');
                 u.volume = 0; window.speechSynthesis.speak(u);
@@ -328,24 +402,15 @@
             try {
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app); db = getFirestore(app);
-                
                 await auth.authStateReady();
-
                 const initAuth = async () => {
                     if (!auth.currentUser) {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             try { await signInWithCustomToken(auth, __initial_auth_token); } catch (e) { await signInAnonymously(auth); }
-                        } else { 
-                            await signInAnonymously(auth); 
-                        }
+                        } else { await signInAnonymously(auth); }
                     }
                 };
-                
-                try {
-                    await initAuth();
-                } catch(authErr) {
-                    console.error("Auth failed:", authErr);
-                }
+                try { await initAuth(); } catch(authErr) { console.error("Auth failed:", authErr); }
 
                 onAuthStateChanged(auth, (u) => { 
                     user = u; 
@@ -369,7 +434,6 @@
                             userInfo.classList.add('hidden');
                             userInfo.classList.remove('flex');
                         }
-                        
                         loadHistory(); 
                     }
                 });
@@ -425,7 +489,7 @@
                     localStorage.setItem('AI_CONNECTION_STATUS', 'SUCCESS');
                     if (pingResp.ok) {
                         badge.textContent = "準備完了！";
-                        errorDetail.innerHTML = `✅ <b>接続成功！</b><br>ゆーみんのキーに最適なAI（<code>${currentWorkingModel}</code>）を設定したで！`;
+                        errorDetail.innerHTML = `✅ <b>接続成功！</b><br>ゆーくんのキーに最適なAI（<code>${currentWorkingModel}</code>）を設定したで！`;
                         errorDetail.className = "text-[10px] text-green-700 font-mono mt-2 bg-green-50 p-3 rounded-lg leading-tight";
                         badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-600";
                     } else {
@@ -480,13 +544,26 @@
             }
         }
 
+        // ★修正ポイント：思考中のステータス表示を新しいUIに反映
         async function askSakuraAI(prompt) {
             if (!prompt || isAIThinking) return;
-            showToast(`ゆーみん: 「${prompt}」`);
-            isAIThinking = true; chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+            showToast(`ゆーくん: 「${prompt}」`);
+            isAIThinking = true; 
+            
+            const statusEl = document.getElementById('ai-status-text');
+            if (statusEl) {
+                statusEl.textContent = '考え中...';
+                if (document.body.classList.contains('driving-mode')) {
+                    statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-900 text-blue-300';
+                } else {
+                    statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-500';
+                }
+            }
+
+            chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
             try {
-                const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーみん」です。現在地: ${lastAddress}。3行以内で返答。`;
+                const sys = `あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザーは「ゆーくん（ゆうま）」です。現在地: ${lastAddress}。3行以内で返答。`;
                 const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent`, { 
                     contents: chatHistory, systemInstruction: { parts: [{ text: sys }] }, tools: [{ "google_search": {} }] 
                 });
@@ -497,16 +574,59 @@
                 if (err.message === "INVALID_KEY") showToast("APIキーが間違ってるみたい。設定を確認してな！", true);
                 else if (err.message === "QUOTA_EXCEEDED") showToast("1分間の制限を超えたわ。ちょっと待ってな！", true);
                 else showToast(`通信エラーやわ…`, true);
-            } finally { isAIThinking = false; }
+            } finally { 
+                isAIThinking = false; 
+                if (statusEl && !isSpeechRecognizing) {
+                    statusEl.textContent = 'タップで会話';
+                    if (document.body.classList.contains('driving-mode')) {
+                        statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-400';
+                    } else {
+                        statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-400';
+                    }
+                }
+            }
         }
 
-        function speakText(txt) {
+        function playAudio(base64) {
+            const bin = atob(base64), bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const sr = 24000, hdr = new ArrayBuffer(44), v = new DataView(hdr);
+            v.setUint32(0, 0x52494646, false); v.setUint32(4, 36 + bin.length, true); v.setUint32(8, 0x57415645, false);
+            v.setUint32(12, 0x666d7420, false); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+            v.setUint16(22, 1, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true);
+            v.setUint16(32, 2, true); v.setUint16(34, 16, true); v.setUint32(36, 0x64617461, false); v.setUint32(40, bin.length, true);
+            const player = document.getElementById('ai-audio-player');
+            if(player) { 
+                player.src = URL.createObjectURL(new Blob([new Uint8Array([...new Uint8Array(hdr), ...bytes])], { type: 'audio/wav' })); 
+                player.volume = voiceVolume; 
+                player.play().catch(e => console.error("Audio play error:", e)); 
+            }
+        }
+
+        // ★修正ポイント：テキストを常に新しいセリフ枠に表示させる
+        async function speakText(txt) {
             if (isMuted) return;
-            const resp = document.getElementById('ai-response-text'); if (resp) resp.textContent = txt;
-            document.getElementById('ai-chat-bubble').style.display = 'block';
-            if (bubbleTimer) clearTimeout(bubbleTimer);
-            bubbleTimer = setTimeout(() => { document.getElementById('ai-chat-bubble').style.display = 'none'; }, Math.max(3000, txt.length * 200));
+            const resp = document.getElementById('ai-response-text'); 
+            if (resp) resp.textContent = txt;
             
+            if (useRealVoice) {
+                try {
+                    const data = await apiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`, { 
+                        contents: [{ parts: [{ text: `Say cheerfully: ${txt}` }] }], 
+                        generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } } } 
+                    }, 1); 
+                    
+                    const pcm = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+                    if (pcm) { 
+                        playAudio(pcm); 
+                        return; 
+                    }
+                } catch(e) {
+                    console.warn("リアルボイスの生成に失敗。標準ボイスに切り替えます。", e);
+                    if (e.message === "QUOTA_EXCEEDED") showToast("API制限や！リアルボイスは一時的にOFFにするな！");
+                }
+            }
+
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(txt); 
@@ -526,10 +646,35 @@
                 const resp = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
                 const data = await resp.json();
                 if (data.elements) {
-                    ORBIS_LIST = data.elements.map(el => ({ lat: el.lat, lng: el.lon, name: el.tags.name || "固定式オービス" }));
+                    ORBIS_LIST = data.elements.map(el => {
+                        let rName = el.tags?.name || "";
+                        if (!rName && el.tags?.ref) rName = el.tags.ref + "号線";
+                        return { lat: el.lat, lng: el.lon, name: el.tags?.name || "固定式オービス", road: rName };
+                    });
                     updateOrbisMarkers();
                 }
             } catch (e) {}
+        }
+
+        async function fetchTrafficData(lat, lng) {
+            if (Date.now() - lastTrafficFetchTime < 120000) return; // 2分に1回更新
+            lastTrafficFetchTime = Date.now();
+            try {
+                const q = `[out:json];(way["highway"="construction"](around:5000,${lat},${lng});node["barrier"="block"](around:5000,${lat},${lng}););out center;`;
+                const resp = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+                const data = await resp.json();
+                if (data.elements) {
+                    TRAFFIC_LIST = data.elements.map(el => {
+                        const clat = el.lat || el.center?.lat;
+                        const clng = el.lon || el.center?.lon;
+                        const tname = el.tags?.highway === "construction" ? "工事中" : "通行止め";
+                        let rName = el.tags?.name || "";
+                        if (!rName && el.tags?.ref) rName = el.tags.ref + "号線";
+                        return clat && clng ? { lat: clat, lng: clng, name: tname, road: rName } : null;
+                    }).filter(Boolean);
+                    updateTrafficMarkers();
+                }
+            } catch (e) { console.error("Traffic fetch error", e); }
         }
 
         function updateOrbisMarkers() {
@@ -538,6 +683,18 @@
                 const icon = L.divIcon({ className: '', html: `<div class="orbis-marker"><i data-lucide="camera" style="width:18px;height:18px;"></i></div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
                 const m = L.marker([orb.lat, orb.lng], { icon: icon }).addTo(map).bindPopup(`<b class="text-red-500">${orb.name}</b>`);
                 orbisMarkers.push(m);
+            });
+            lucide.createIcons();
+        }
+
+        function updateTrafficMarkers() {
+            if (!map) return; 
+            trafficMarkers.forEach(m => map.removeLayer(m)); 
+            trafficMarkers = [];
+            TRAFFIC_LIST.forEach(tf => {
+                const icon = L.divIcon({ className: '', html: `<div class="bg-yellow-500 text-white border-2 border-white rounded-full w-8 h-8 display flex items-center justify-center shadow-md"><i data-lucide="alert-triangle" style="width:16px;height:16px;"></i></div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+                const m = L.marker([tf.lat, tf.lng], { icon: icon }).addTo(map).bindPopup(`<b class="text-yellow-600">${tf.name}エリア</b>`);
+                trafficMarkers.push(m);
             });
             lucide.createIcons();
         }
@@ -552,9 +709,10 @@
             return (brng + 360) % 360;
         }
 
-        function checkOrbis(lat, lng) {
+        async function checkOrbis(lat, lng) {
             if (ORBIS_LIST.length === 0) return;
             let targetZone = 0;
+            let targetOrb = null;
             
             ORBIS_LIST.forEach(orb => { 
                 const d = getDistance(lat, lng, orb.lat, orb.lng); 
@@ -566,18 +724,101 @@
                     
                     if (Math.abs(angleDiff) <= 60 || currentHeading === 0) {
                         let z = (d <= 200) ? 3 : (d <= 500) ? 2 : 1;
-                        if (z > targetZone) targetZone = z;
+                        if (z > targetZone) {
+                            targetZone = z;
+                            targetOrb = orb;
+                        }
                     }
                 }
             });
 
-            const overlay = document.getElementById('orbis-flash-overlay');
-            if (targetZone !== currentOrbisZone) {
-                overlay.className = '';
-                if (targetZone === 1) { overlay.classList.add('flash-blue'); speakText("ゆーみん、この先の道にオービスあるで。"); }
-                else if (targetZone === 2) { overlay.classList.add('flash-yellow'); speakText("前方のオービスまであと500メートルや！速度チェック！"); }
-                else if (targetZone === 3) { overlay.classList.add('flash-red'); speakText("すぐそこや！本気で気をつけてな！"); }
-                currentOrbisZone = targetZone;
+            if (targetZone > 0 && targetZone !== currentOrbisZone) {
+                const prevZone = currentOrbisZone;
+                currentOrbisZone = targetZone; 
+                
+                if (targetZone > prevZone) {
+                    let roadStr = "この先の道";
+                    if (targetOrb.road) {
+                        roadStr = targetOrb.road;
+                    } else {
+                        try {
+                            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${targetOrb.lat}&lon=${targetOrb.lng}&zoom=17`, { headers: { 'Accept-Language': 'ja' } });
+                            const data = await resp.json();
+                            if (data && data.address && data.address.road) {
+                                roadStr = data.address.road;
+                                targetOrb.road = roadStr; 
+                            }
+                        } catch (e) {}
+                    }
+
+                    const overlay = document.getElementById('orbis-flash-overlay');
+                    overlay.className = '';
+                    if (targetZone === 1) { overlay.classList.add('flash-blue'); speakText(`ゆーくん、${roadStr}でオービスあるで。`); }
+                    else if (targetZone === 2) { overlay.classList.add('flash-yellow'); speakText(`${roadStr}のオービスまであと500メートルや！速度チェック！`); }
+                    else if (targetZone === 3) { overlay.classList.add('flash-red'); speakText("オービスすぐそこや！本気で気をつけてな！"); }
+                } else {
+                    const overlay = document.getElementById('orbis-flash-overlay');
+                    overlay.className = '';
+                    if (targetZone === 1) overlay.classList.add('flash-blue');
+                    else if (targetZone === 2) overlay.classList.add('flash-yellow');
+                    else if (targetZone === 3) overlay.classList.add('flash-red');
+                }
+            } else if (targetZone === 0 && currentOrbisZone !== 0) {
+                currentOrbisZone = 0;
+                document.getElementById('orbis-flash-overlay').className = '';
+            }
+        }
+
+        async function checkTraffic(lat, lng) {
+            if (TRAFFIC_LIST.length === 0) return;
+            let targetZone = 0;
+            let targetTf = null;
+            
+            TRAFFIC_LIST.forEach(tf => { 
+                const d = getDistance(lat, lng, tf.lat, tf.lng); 
+                if (d <= 800) {
+                    const bearingToTraffic = getBearing(lat, lng, tf.lat, tf.lng);
+                    let angleDiff = bearingToTraffic - currentHeading;
+                    angleDiff = (angleDiff + 180) % 360 - 180;
+                    if (angleDiff <= -180) angleDiff += 360;
+                    
+                    if (Math.abs(angleDiff) <= 45 || currentHeading === 0) {
+                        let z = (d <= 300) ? 2 : 1;
+                        if (z > targetZone) {
+                            targetZone = z;
+                            targetTf = tf;
+                        }
+                    }
+                }
+            });
+
+            if (targetZone > 0 && targetZone !== currentTrafficZone) {
+                const prevZone = currentTrafficZone;
+                currentTrafficZone = targetZone;
+                
+                if (targetZone > prevZone) {
+                    let roadStr = "この先";
+                    if (targetTf.road) {
+                        roadStr = targetTf.road;
+                    } else {
+                        try {
+                            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${targetTf.lat}&lon=${targetTf.lng}&zoom=17`, { headers: { 'Accept-Language': 'ja' } });
+                            const data = await resp.json();
+                            if (data && data.address && data.address.road) {
+                                roadStr = data.address.road;
+                                targetTf.road = roadStr;
+                            }
+                        } catch (e) {}
+                    }
+
+                    if (targetZone === 1) { 
+                        speakText(`ゆーくん、${roadStr}で${targetTf.name}の場所があるみたいやわ。`); 
+                    } else if (targetZone === 2) { 
+                        speakText(`もうすぐ${roadStr}の${targetTf.name}エリアやで！気ぃつけてな！`); 
+                    }
+                }
+            } else if (targetZone === 0 && currentTrafficZone !== 0) {
+                currentTrafficZone = 0;
             }
         }
 
@@ -613,7 +854,9 @@
             currentPos = [lat, lng]; 
             document.getElementById('address-display').classList.remove('text-red-500'); 
             
-            fetchOrbisData(lat, lng); checkOrbis(lat, lng); updateAddress(lat, lng);
+            fetchOrbisData(lat, lng); checkOrbis(lat, lng); 
+            fetchTrafficData(lat, lng); checkTraffic(lat, lng); 
+            updateAddress(lat, lng);
             
             const accEl = document.getElementById('gps-accuracy');
             if (accEl) {
@@ -639,7 +882,6 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
-        // ★修正ポイント：画面遷移時に「どこから来たか」を記録して戻るボタンを賢くする
         function switchView(id) {
             if (id === 'detail-view') {
                 const currentActive = document.querySelector('.view-screen.active');
@@ -708,7 +950,6 @@
             
             let pointsData = [];
             try {
-                // 文字列で保存されてる場合はパースする
                 pointsData = typeof item.points === 'string' ? JSON.parse(item.points) : item.points;
             } catch(e) {
                 console.error("Points Parse Error", e);
@@ -719,7 +960,6 @@
                 detailPolyline = L.polyline(latlngs, { color: '#ec4899', weight: 5 }).addTo(detailMap); 
                 detailMap.fitBounds(detailPolyline.getBounds(), { padding: [20, 20] }); 
             } else {
-                // ルートがない場合は現在地か東京駅にセット
                 const centerPos = currentPos || [35.68, 139.76];
                 detailMap.setView(centerPos, 15);
             }
@@ -736,40 +976,30 @@
             document.getElementById('close-map-btn').onclick = () => switchView('main-view');
             document.getElementById('open-history-btn').onclick = () => switchView('history-view');
             document.getElementById('close-history-btn').onclick = () => switchView('main-view');
-            
-            // ★リザルト画面の戻るボタン（どこから来たかで戻り先を変える）
             document.getElementById('close-detail-btn').onclick = () => switchView(previousView);
 
             document.getElementById('dl-full-btn').onclick = async () => { showToast("作成中..."); const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); const link = document.createElement('a'); link.download = `record_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
             
-            // ★B案：地図の背景だけを消して、軌跡とスタッツをオシャレに保存する機能
             document.getElementById('dl-no-map-btn').onclick = async () => { 
                 showToast("オシャレ画像を作成中...");
-                
-                // 地図の背景画像(タイル)とズームボタンを一時的に取得
                 const tilePane = document.querySelector('#detail-map .leaflet-tile-pane');
                 const controlContainer = document.querySelector('#detail-map .leaflet-control-container');
                 const detailMapEl = document.getElementById('detail-map');
                 const watermark = document.getElementById('watermark');
                 
-                // 元の状態を記憶
                 const originalTileDisplay = tilePane ? tilePane.style.display : '';
                 const originalControlDisplay = controlContainer ? controlContainer.style.display : '';
                 const originalMapBg = detailMapEl.style.backgroundColor;
                 
-                // 背景地図とボタンを隠し、枠を透明にして、ロゴを表示！
                 if (tilePane) tilePane.style.display = 'none';
                 if (controlContainer) controlContainer.style.display = 'none';
                 detailMapEl.style.backgroundColor = 'transparent';
                 if (watermark) watermark.classList.remove('hidden');
                 
-                // 画面が切り替わるのを一瞬(0.2秒)待つ
                 await new Promise(r => setTimeout(r, 200));
 
-                // 全体を真っ白な背景としてキャプチャ（軌跡と数字だけが残る！）
                 const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }); 
                 
-                // 終わったら元の地図状態に戻す
                 if (tilePane) tilePane.style.display = originalTileDisplay;
                 if (controlContainer) controlContainer.style.display = originalControlDisplay;
                 detailMapEl.style.backgroundColor = originalMapBg;
@@ -802,20 +1032,42 @@
             
             const slider = document.getElementById('volume-slider'); slider.value = voiceVolume * 100;
             slider.oninput = (e) => { voiceVolume = e.target.value / 100; localStorage.setItem('voiceVolume', voiceVolume); };
+            
             const muteBtn = document.getElementById('mute-toggle-btn');
             muteBtn.onclick = () => { isMuted = !isMuted; localStorage.setItem('isMuted', isMuted); document.getElementById('mute-icon').setAttribute('data-lucide', isMuted ? 'volume-x' : 'volume-2'); muteBtn.classList.toggle('text-red-500', isMuted); lucide.createIcons(); };
 
+            const realVoiceToggle = document.getElementById('real-voice-toggle');
+            if (realVoiceToggle) {
+                realVoiceToggle.checked = useRealVoice;
+                realVoiceToggle.addEventListener('change', (e) => {
+                    useRealVoice = e.target.checked;
+                    localStorage.setItem('useRealVoice', useRealVoice);
+                    if(useRealVoice) showToast("超リアルボイスONやで！");
+                });
+            }
+
             const walkBtn = document.getElementById('mode-walking');
             const driveBtn = document.getElementById('mode-driving');
-            const hud = document.getElementById('nav-hud');
 
-            const handleWalk = (e) => { e.preventDefault(); currentMode = 'walking'; walkBtn.classList.add('active'); driveBtn.classList.remove('active'); driveBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'none'; };
-            const handleDrive = (e) => { e.preventDefault(); currentMode = 'driving'; driveBtn.classList.add('active'); driveBtn.classList.remove('bg-gray-50', 'text-gray-400'); walkBtn.classList.remove('active'); walkBtn.classList.add('bg-gray-50', 'text-gray-400'); hud.style.display = 'flex'; };
+            const handleWalk = (e) => { 
+                e.preventDefault(); currentMode = 'walking'; 
+                document.body.classList.remove('driving-mode');
+                walkBtn.classList.add('active'); driveBtn.classList.remove('active'); 
+                if (polyline) polyline.setStyle({ color: '#ec4899' }); 
+                if (marker) marker.setStyle({ fillColor: '#ec4899' });
+                if (detailPolyline) detailPolyline.setStyle({ color: '#ec4899' });
+            };
+            const handleDrive = (e) => { 
+                e.preventDefault(); currentMode = 'driving'; 
+                document.body.classList.add('driving-mode'); 
+                driveBtn.classList.add('active'); walkBtn.classList.remove('active'); 
+                if (polyline) polyline.setStyle({ color: '#06b6d4' }); 
+                if (marker) marker.setStyle({ fillColor: '#06b6d4' });
+                if (detailPolyline) detailPolyline.setStyle({ color: '#06b6d4' });
+            };
 
             walkBtn.addEventListener('click', handleWalk); walkBtn.addEventListener('touchend', handleWalk);
             driveBtn.addEventListener('click', handleDrive); driveBtn.addEventListener('touchend', handleDrive);
-
-            document.getElementById('stop-nav-btn').onclick = () => hud.style.display = 'none';
 
             const confirmModal = document.getElementById('confirm-modal');
             const toggleBtn = document.getElementById('record-toggle-btn');
@@ -841,7 +1093,6 @@
                 confirmModal.classList.add('hidden');
             };
 
-            // ★修正ポイント：記録停止時にすぐリザルト画面を表示し、裏で保存する
             document.getElementById('confirm-ok-btn').onclick = async () => {
                 confirmModal.classList.add('hidden');
                 isTracking = false;
@@ -851,7 +1102,6 @@
                 toggleIcon.setAttribute('data-lucide', 'play'); 
                 lucide.createIcons();
 
-                // 今回の記録データを作成
                 const endTime = Date.now();
                 const currentRecord = {
                     mode: currentMode,
@@ -863,15 +1113,13 @@
 
                 speakText("お疲れ様！今日のリザルトまとめたで！"); 
 
-                // ★クラウド保存を待たずに、すぐにリザルト画面を表示！
                 openRecordDetail(currentRecord);
 
-                // 裏でコッソリFirestoreに保存を試みる
                 if (user && db) { 
                     try { 
                         await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'), { userId: user.uid, ...currentRecord }); 
                         showToast("クラウドに記録を保存したで！");
-                        loadHistory(); // 履歴リストの更新
+                        loadHistory(); 
                     } catch (err) { 
                         console.error("Save Error:", err);
                         showToast("保存失敗: データベースルールの期限切れかも？でも今の結果はDLできるで！", true); 
@@ -881,17 +1129,67 @@
                 }
             };
 
+            // ★修正ポイント：マイク機能とUIを新しいセリフ枠に統合
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr) {
                 const rec = new sr(); rec.lang = 'ja-JP'; 
-                rec.onstart = () => { isSpeechRecognizing = true; document.getElementById('ai-mic-btn').classList.add('recording'); showToast("🎙️ 聞いてるで！"); };
-                rec.onend = () => { isSpeechRecognizing = false; document.getElementById('ai-mic-btn').classList.remove('recording'); };
-                rec.onerror = () => { isSpeechRecognizing = false; document.getElementById('ai-mic-btn').classList.remove('recording'); };
+                const dialogBox = document.getElementById('ai-dialog-box');
+                const statusEl = document.getElementById('ai-status-text');
+                const micIndicator = document.getElementById('mic-indicator');
+
+                rec.onstart = () => { 
+                    isSpeechRecognizing = true; 
+                    dialogBox.classList.add('listening'); 
+                    if(micIndicator) micIndicator.classList.remove('hidden');
+                    if(statusEl) {
+                        statusEl.textContent = '聞いてるで！';
+                        if (document.body.classList.contains('driving-mode')) {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-300';
+                        } else {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-100 text-pink-500';
+                        }
+                    }
+                };
+                rec.onend = () => { 
+                    isSpeechRecognizing = false; 
+                    dialogBox.classList.remove('listening'); 
+                    if(micIndicator) micIndicator.classList.add('hidden');
+                    if(!isAIThinking && statusEl) {
+                        statusEl.textContent = 'タップで会話';
+                        if (document.body.classList.contains('driving-mode')) {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-400';
+                        } else {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-400';
+                        }
+                    }
+                };
+                rec.onerror = () => { 
+                    isSpeechRecognizing = false; 
+                    dialogBox.classList.remove('listening'); 
+                    if(micIndicator) micIndicator.classList.add('hidden');
+                    if(statusEl) {
+                        statusEl.textContent = 'タップで会話';
+                        if (document.body.classList.contains('driving-mode')) {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-700 text-slate-400';
+                        } else {
+                            statusEl.className = 'text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-400';
+                        }
+                    }
+                };
                 rec.onresult = (e) => askSakuraAI(e.results[0][0].transcript);
-                const micBtn = document.getElementById('ai-mic-btn');
-                const handleMic = (e) => { if (e) e.preventDefault(); if (isSpeechRecognizing) return; unlockAudio(); try { rec.start(); } catch(err) {} };
-                micBtn.addEventListener('click', (e) => { if (e.pointerType === "touch") return; handleMic(e); });
-                micBtn.addEventListener('touchend', handleMic);
+                
+                const handleMic = (e) => { 
+                    if (e) e.preventDefault(); 
+                    if (isSpeechRecognizing) {
+                        try { rec.stop(); } catch(err) {}
+                        return;
+                    } 
+                    unlockAudio(); 
+                    try { rec.start(); } catch(err) {} 
+                };
+                // セリフ枠全体をタップでマイクON/OFF
+                dialogBox.addEventListener('click', (e) => { if (e.pointerType === "touch") return; handleMic(e); });
+                dialogBox.addEventListener('touchend', handleMic);
             }
 
             map = L.map('map', { zoomControl: false }).setView([35.68, 139.76], 15); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
