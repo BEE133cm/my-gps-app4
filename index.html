@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracker Pro v17.42 (History Merge & DB Rule Check)</title>
+    <title>GPS Tracker Pro v17.43 (Direct Result View)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -52,7 +52,7 @@
     <!-- メイン画面 -->
     <div id="main-view" class="view-screen active p-4 gap-4 overflow-y-auto pb-28">
         <header class="flex justify-between items-center py-2 shrink-0">
-            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.42</span></h1>
+            <h1 class="text-2xl font-black text-pink-600 italic">TRACKER <span class="text-gray-400 font-normal text-sm not-italic">v17.43</span></h1>
             <div class="flex gap-2">
                 <button id="open-history-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="list"></i></button>
                 <button id="open-settings-btn" class="bg-white p-2.5 rounded-full shadow-sm border border-gray-100 active:bg-gray-50"><i data-lucide="settings"></i></button>
@@ -125,7 +125,7 @@
         <div id="history-list" class="p-4 flex flex-col gap-3 overflow-y-auto"></div>
     </div>
 
-    <!-- 記録詳細画面 -->
+    <!-- 記録詳細画面（リザルト画面） -->
     <div id="detail-view" class="view-screen">
         <header class="bg-white p-4 shadow-sm flex items-center justify-between border-b shrink-0">
             <button id="close-detail-btn" class="font-bold text-gray-600 p-2"><i data-lucide="chevron-left"></i> 戻る</button>
@@ -133,7 +133,7 @@
             <div class="w-8"></div>
         </header>
         <div id="detail-content" class="p-4 flex flex-col gap-4 overflow-y-auto">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4" id="capture-area">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 relative" id="capture-area">
                 <div class="flex justify-between items-center">
                     <div id="detail-date" class="text-lg font-black text-gray-800">2024/01/01</div>
                     <div id="detail-mode-badge" class="px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs font-bold flex items-center gap-1">
@@ -150,11 +150,13 @@
                         <p id="detail-time" class="text-2xl font-black text-blue-500">00:00:00</p>
                     </div>
                 </div>
-                <div id="detail-map" style="height: 280px;" class="mt-2"></div>
+                <div id="detail-map" style="height: 280px; border-radius: 12px; background-color: #f3f4f6;" class="mt-2 relative z-0"></div>
+                <!-- ★キャプチャ時だけ現れるオシャレな透かしロゴ -->
+                <div id="watermark" class="absolute bottom-8 right-8 font-black text-pink-600/20 italic text-2xl z-10 pointer-events-none hidden">TRACKER Pro</div>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <button id="dl-full-btn" class="bg-pink-500 text-white font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center gap-1 active:scale-95"><i data-lucide="download"></i><span class="text-[10px]">全部保存</span></button>
-                <button id="dl-no-map-btn" class="bg-white border-2 border-pink-500 text-pink-600 font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center gap-1 active:scale-95"><i data-lucide="file-text"></i><span class="text-[10px]">地図抜き保存</span></button>
+                <button id="dl-no-map-btn" class="bg-white border-2 border-pink-500 text-pink-600 font-bold py-4 rounded-2xl shadow-sm flex flex-col items-center gap-1 active:scale-95"><i data-lucide="file-text"></i><span class="text-[10px]">アート保存(軌跡のみ)</span></button>
             </div>
         </div>
     </div>
@@ -176,13 +178,13 @@
         <div class="bg-white p-6 rounded-3xl w-80 max-w-[90%] shadow-2xl transform transition-all">
             <div class="flex flex-col items-center gap-3">
                 <div class="bg-pink-100 p-4 rounded-full text-pink-500 mb-2">
-                    <i data-lucide="save" class="w-8 h-8"></i>
+                    <i data-lucide="flag" class="w-8 h-8"></i>
                 </div>
                 <h3 class="text-xl font-black text-gray-800">記録を終了する？</h3>
-                <p class="text-sm text-gray-500 text-center mb-4">お疲れ様！今のルート記録を保存して終了してええかな？</p>
+                <p class="text-sm text-gray-500 text-center mb-4">お疲れ様！<br>終了して今日のリザルトを見るで！</p>
                 <div class="flex gap-3 w-full">
                     <button id="confirm-cancel-btn" class="flex-1 py-3.5 rounded-xl font-bold bg-gray-100 text-gray-600 active:bg-gray-200">やっぱ続ける</button>
-                    <button id="confirm-ok-btn" class="flex-1 py-3.5 rounded-xl font-bold bg-pink-500 text-white shadow-md active:bg-pink-600">終了して保存</button>
+                    <button id="confirm-ok-btn" class="flex-1 py-3.5 rounded-xl font-bold bg-pink-500 text-white shadow-md active:bg-pink-600">終了する</button>
                 </div>
             </div>
         </div>
@@ -210,7 +212,6 @@
         </header>
         <div class="p-4 flex flex-col gap-6 overflow-y-auto">
             
-            <!-- アカウント設定＆Googleログイン -->
             <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">アカウント (データ保存用)</h3>
                 
@@ -285,6 +286,9 @@
         let currentHeading = 0;
         let lastPosForHeading = null;
         let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
+
+        // ★戻るボタン用の画面履歴
+        let previousView = 'main-view';
 
         function updateNetworkStatus() {
             const statusEl = document.getElementById('network-status');
@@ -609,9 +613,7 @@
             currentPos = [lat, lng]; 
             document.getElementById('address-display').classList.remove('text-red-500'); 
             
-            fetchOrbisData(lat, lng); 
-            checkOrbis(lat, lng); 
-            updateAddress(lat, lng);
+            fetchOrbisData(lat, lng); checkOrbis(lat, lng); updateAddress(lat, lng);
             
             const accEl = document.getElementById('gps-accuracy');
             if (accEl) {
@@ -637,7 +639,15 @@
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
 
+        // ★修正ポイント：画面遷移時に「どこから来たか」を記録して戻るボタンを賢くする
         function switchView(id) {
+            if (id === 'detail-view') {
+                const currentActive = document.querySelector('.view-screen.active');
+                if (currentActive && currentActive.id !== 'detail-view') {
+                    previousView = currentActive.id;
+                }
+            }
+            
             document.querySelectorAll('.view-screen').forEach(v => v.classList.remove('active'));
             const target = document.getElementById(id);
             if (target) {
@@ -653,38 +663,23 @@
             const t = document.getElementById('toast'); if (t) { t.textContent = msg; t.style.display = 'block'; t.style.backgroundColor = isError ? '#ef4444' : '#000'; setTimeout(() => { if (t.textContent === msg) t.style.display = 'none'; }, 5000); }
         }
 
-        // ★修正ポイント：過去のデータ(パブリック)と今のデータ(プライベート)を両方読み込んで合体する
         async function loadHistory() {
-            if (!user || !db) return; 
-            const listEl = document.getElementById('history-list'); 
-            if (!listEl) return;
-            
+            if (!user || !db) return; const listEl = document.getElementById('history-list'); if (!listEl) return;
             try {
                 let items = []; 
-                
-                // 1. 古いパブリックデータ（過去の記録）を捜索
                 try {
                     const qPub = query(collection(db, 'artifacts', appId, 'public', 'data', 'routes'));
                     const snapPub = await getDocs(qPub);
-                    snapPub.forEach(doc => { 
-                        const data = doc.data(); 
-                        if(data.userId === user.uid) items.push({ id: doc.id, ...data }); 
-                    });
-                } catch(e) { console.warn("古いデータの読み込みスキップ:", e); }
+                    snapPub.forEach(doc => { const data = doc.data(); if(data.userId === user.uid) items.push({ id: doc.id, ...data }); });
+                } catch(e) {}
 
-                // 2. 新しいプライベートデータ（今の記録）を捜索
                 try {
                     const qPriv = query(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'));
                     const snapPriv = await getDocs(qPriv);
-                    snapPriv.forEach(doc => { 
-                        items.push({ id: doc.id, ...doc.data() }); 
-                    });
-                } catch(e) { console.warn("新しいデータの読み込みスキップ:", e); }
+                    snapPriv.forEach(doc => { items.push({ id: doc.id, ...doc.data() }); });
+                } catch(e) {}
 
-                // もし同じデータが混ざってたら省く（IDで判定）
                 const uniqueItems = Array.from(new Map(items.map(item => [item.id, item])).values());
-
-                // 時間が新しい順に並べ替え
                 uniqueItems.sort((a,b) => b.startTime - a.startTime);
                 
                 listEl.innerHTML = uniqueItems.length ? '' : '<p class="text-center text-gray-400 mt-10">記録がまだあらへんわ。</p>';
@@ -696,10 +691,7 @@
                     div.onclick = () => openRecordDetail(item); listEl.appendChild(div);
                 });
                 lucide.createIcons();
-            } catch (e) {
-                console.error("履歴の読み込みに失敗:", e);
-                showToast("履歴の読み込みに失敗したわ…ルールの期限切れかも？", true);
-            }
+            } catch (e) { console.error("履歴の読み込みに失敗:", e); }
         }
 
         function openRecordDetail(item) {
@@ -708,11 +700,29 @@
             const diff = Math.floor((item.endTime - item.startTime) / 1000);
             document.getElementById('detail-time').textContent = `${String(Math.floor(diff/3600)).padStart(2,'0')}:${String(Math.floor((diff%3600)/60)).padStart(2,'0')}:${String(diff%60).padStart(2,'0')}`;
             document.getElementById('detail-mode-badge').innerHTML = `<i data-lucide="${item.mode==='walking'?'footprints':'car'}" class="w-3 h-3"></i> ${item.mode==='walking'?'ウォーキング':'ドライブ'}`;
+            
             switchView('detail-view');
+            
             if (!detailMap) { detailMap = L.map('detail-map', { zoomControl: false }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(detailMap); }
             if (detailPolyline) detailMap.removeLayer(detailPolyline);
-            const points = JSON.parse(item.points);
-            if (points && points.length > 0) { const latlngs = points.map(p => [p.lat, p.lng]); detailPolyline = L.polyline(latlngs, { color: '#ec4899', weight: 5 }).addTo(detailMap); detailMap.fitBounds(detailPolyline.getBounds(), { padding: [20, 20] }); }
+            
+            let pointsData = [];
+            try {
+                // 文字列で保存されてる場合はパースする
+                pointsData = typeof item.points === 'string' ? JSON.parse(item.points) : item.points;
+            } catch(e) {
+                console.error("Points Parse Error", e);
+            }
+            
+            if (pointsData && pointsData.length > 0) { 
+                const latlngs = pointsData.map(p => [p.lat, p.lng]); 
+                detailPolyline = L.polyline(latlngs, { color: '#ec4899', weight: 5 }).addTo(detailMap); 
+                detailMap.fitBounds(detailPolyline.getBounds(), { padding: [20, 20] }); 
+            } else {
+                // ルートがない場合は現在地か東京駅にセット
+                const centerPos = currentPos || [35.68, 139.76];
+                detailMap.setView(centerPos, 15);
+            }
             lucide.createIcons();
         }
 
@@ -726,10 +736,51 @@
             document.getElementById('close-map-btn').onclick = () => switchView('main-view');
             document.getElementById('open-history-btn').onclick = () => switchView('history-view');
             document.getElementById('close-history-btn').onclick = () => switchView('main-view');
-            document.getElementById('close-detail-btn').onclick = () => switchView('history-view');
+            
+            // ★リザルト画面の戻るボタン（どこから来たかで戻り先を変える）
+            document.getElementById('close-detail-btn').onclick = () => switchView(previousView);
 
             document.getElementById('dl-full-btn').onclick = async () => { showToast("作成中..."); const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); const link = document.createElement('a'); link.download = `record_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
-            document.getElementById('dl-no-map-btn').onclick = async () => { const mapEl = document.getElementById('detail-map'); mapEl.style.display = 'none'; const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2 }); mapEl.style.display = 'block'; const link = document.createElement('a'); link.download = `stats_${Date.now()}.png`; link.href = canvas.toDataURL(); link.click(); showToast("保存！"); };
+            
+            // ★B案：地図の背景だけを消して、軌跡とスタッツをオシャレに保存する機能
+            document.getElementById('dl-no-map-btn').onclick = async () => { 
+                showToast("オシャレ画像を作成中...");
+                
+                // 地図の背景画像(タイル)とズームボタンを一時的に取得
+                const tilePane = document.querySelector('#detail-map .leaflet-tile-pane');
+                const controlContainer = document.querySelector('#detail-map .leaflet-control-container');
+                const detailMapEl = document.getElementById('detail-map');
+                const watermark = document.getElementById('watermark');
+                
+                // 元の状態を記憶
+                const originalTileDisplay = tilePane ? tilePane.style.display : '';
+                const originalControlDisplay = controlContainer ? controlContainer.style.display : '';
+                const originalMapBg = detailMapEl.style.backgroundColor;
+                
+                // 背景地図とボタンを隠し、枠を透明にして、ロゴを表示！
+                if (tilePane) tilePane.style.display = 'none';
+                if (controlContainer) controlContainer.style.display = 'none';
+                detailMapEl.style.backgroundColor = 'transparent';
+                if (watermark) watermark.classList.remove('hidden');
+                
+                // 画面が切り替わるのを一瞬(0.2秒)待つ
+                await new Promise(r => setTimeout(r, 200));
+
+                // 全体を真っ白な背景としてキャプチャ（軌跡と数字だけが残る！）
+                const canvas = await html2canvas(document.getElementById('capture-area'), { useCORS: true, scale: 2, backgroundColor: '#ffffff' }); 
+                
+                // 終わったら元の地図状態に戻す
+                if (tilePane) tilePane.style.display = originalTileDisplay;
+                if (controlContainer) controlContainer.style.display = originalControlDisplay;
+                detailMapEl.style.backgroundColor = originalMapBg;
+                if (watermark) watermark.classList.add('hidden');
+
+                const link = document.createElement('a'); 
+                link.download = `track_art_${Date.now()}.png`; 
+                link.href = canvas.toDataURL(); 
+                link.click(); 
+                showToast("アート画像の保存完了やで！"); 
+            };
 
             document.getElementById('google-login-btn').onclick = async () => {
                 try {
@@ -766,7 +817,6 @@
 
             document.getElementById('stop-nav-btn').onclick = () => hud.style.display = 'none';
 
-            // ★修正ポイント：保存失敗時のエラーメッセージを具体的にして原因を知らせる
             const confirmModal = document.getElementById('confirm-modal');
             const toggleBtn = document.getElementById('record-toggle-btn');
             const toggleText = document.getElementById('btn-text'); 
@@ -791,26 +841,43 @@
                 confirmModal.classList.add('hidden');
             };
 
+            // ★修正ポイント：記録停止時にすぐリザルト画面を表示し、裏で保存する
             document.getElementById('confirm-ok-btn').onclick = async () => {
                 confirmModal.classList.add('hidden');
                 isTracking = false;
-                speakText("お疲れ様！記録を保存するね！"); 
+                
                 toggleBtn.classList.replace('bg-red-500', 'bg-green-500'); 
                 toggleText.textContent = "記録開始"; 
                 toggleIcon.setAttribute('data-lucide', 'play'); 
                 lucide.createIcons();
 
-                if (!user || !db) { 
-                    showToast("ログインしてへんから保存できんかったわ…ごめん！", true); 
-                } else {
+                // 今回の記録データを作成
+                const endTime = Date.now();
+                const currentRecord = {
+                    mode: currentMode,
+                    distance: totalDistance,
+                    startTime: startTime,
+                    endTime: endTime,
+                    points: JSON.stringify(historyPoints)
+                };
+
+                speakText("お疲れ様！今日のリザルトまとめたで！"); 
+
+                // ★クラウド保存を待たずに、すぐにリザルト画面を表示！
+                openRecordDetail(currentRecord);
+
+                // 裏でコッソリFirestoreに保存を試みる
+                if (user && db) { 
                     try { 
-                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'), { userId: user.uid, mode: currentMode, distance: totalDistance, startTime: startTime, endTime: Date.now(), points: JSON.stringify(historyPoints) }); 
-                        showToast("記録を保存したで！履歴から見てみてな！");
-                        loadHistory(); 
+                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'routes'), { userId: user.uid, ...currentRecord }); 
+                        showToast("クラウドに記録を保存したで！");
+                        loadHistory(); // 履歴リストの更新
                     } catch (err) { 
                         console.error("Save Error:", err);
-                        showToast("保存失敗: データベースルールの期限切れ（テストモード）の可能性が高いわ！設定確認してみてな！", true); 
+                        showToast("保存失敗: データベースルールの期限切れかも？でも今の結果はDLできるで！", true); 
                     }
+                } else {
+                    showToast("ログインしてへんからクラウド保存はスキップしたで。", true);
                 }
             };
 
