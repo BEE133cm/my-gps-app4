@@ -226,6 +226,9 @@
         let POI_LIST = []; 
         let lastPoiFetchTime = 0;
         let notifiedPois = new Set(); 
+        
+        // ★追加：使用するAIモデルを記憶する変数（デフォルトは安定版）
+        let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
 
         function showToast(msg) {
             const t = document.getElementById('toast');
@@ -438,12 +441,19 @@
                     generationConfig: { responseMimeType: "application/json" }
                 };
 
-                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                // ★修正：固定のテスト版モデルではなく、利用可能な安定版モデル（currentWorkingModel）を使うように変更
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent?key=${apiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reqBody)
                 });
                 
-                if (!resp.ok) throw new Error("API_ERR");
+                if (!resp.ok) {
+                    const errData = await resp.json();
+                    console.error("API Error details:", errData);
+                    if (resp.status === 403) throw new Error("INVALID_KEY");
+                    if (resp.status === 429) throw new Error("QUOTA_EXCEEDED");
+                    throw new Error("API_ERR");
+                }
                 
                 const data = await resp.json();
                 const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -596,6 +606,35 @@
             fetchNearbyPOI(lat, lng).then(() => checkSurroundings(lat, lng));
         }
 
+        // ★追加：接続テスト関数（使えるモデルを判定する）
+        async function testAIConnection(key) {
+            const msgEl = document.getElementById('api-status-msg');
+            msgEl.textContent = "接続テスト中...";
+            msgEl.className = "text-xs mt-3 text-center font-bold text-slate-400";
+            
+            try {
+                const listResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+                if (!listResp.ok) throw new Error(listResp.status === 403 ? "INVALID_KEY" : "LIST_FAILED");
+                const listData = await listResp.json();
+                const availableModels = listData.models.filter(m => 
+                    m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent") && m.name.includes("gemini")
+                );
+                if (availableModels.length === 0) throw new Error("NO_MODELS");
+                
+                // gemini-1.5-flash を優先的に探して使う
+                let bestModel = availableModels.find(m => m.name.includes("1.5-flash")) || availableModels[0];
+                currentWorkingModel = bestModel.name.replace("models/", "");
+                localStorage.setItem('AI_WORKING_MODEL', currentWorkingModel);
+                
+                msgEl.textContent = `接続成功！(${currentWorkingModel})`;
+                msgEl.className = "text-xs mt-3 text-center font-bold text-cyan-400";
+            } catch (e) {
+                if (e.message === "INVALID_KEY") msgEl.textContent = "キーが無効みたいやわ！";
+                else msgEl.textContent = "テスト失敗。通信環境を確認してな。";
+                msgEl.className = "text-xs mt-3 text-center font-bold text-red-500";
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
 
@@ -605,16 +644,16 @@
                 document.getElementById('real-voice-toggle').checked = useRealVoice;
                 document.getElementById('volume-slider').value = voiceVolume * 100;
                 document.getElementById('modal-settings').classList.add('active');
+                if (apiKey) testAIConnection(apiKey); // ★開いた時に状態をチェック
             };
             document.querySelectorAll('.close-modal').forEach(btn => {
                 btn.onclick = (e) => e.target.closest('.modal').classList.remove('active');
             });
 
-            document.getElementById('save-key-btn').onclick = () => {
+            document.getElementById('save-key-btn').onclick = async () => {
                 apiKey = document.getElementById('api-key-input').value.trim();
                 localStorage.setItem('GEMINI_API_KEY', apiKey);
-                document.getElementById('api-status-msg').textContent = "キーを保存したで！";
-                document.getElementById('api-status-msg').className = "text-xs mt-3 text-center font-bold text-cyan-400";
+                await testAIConnection(apiKey); // ★修正：保存時に接続テストを実行
             };
             document.getElementById('real-voice-toggle').onchange = (e) => {
                 useRealVoice = e.target.checked;
