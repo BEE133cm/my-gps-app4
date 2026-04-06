@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Drive Assistant - SAKURA</title>
+    <title>AI Drive Assistant - SAKURA v2.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body, html { height: 100%; margin: 0; background-color: #0f172a; color: #f8fafc; overflow: hidden; font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; touch-action: manipulation; }
         
-        /* 電光掲示板のスタイル */
+        /* 電光掲示板のスタイル（タップ可能に） */
         .led-board {
             background-color: #000;
             border: 8px solid #1e293b;
@@ -20,6 +20,13 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s, border-color 0.3s;
+        }
+        
+        /* タップした時に少し沈むエフェクト */
+        .led-board:active {
+            transform: scale(0.98);
         }
         
         /* 網目模様（LEDのドット感） */
@@ -42,15 +49,14 @@
             white-space: nowrap;
         }
 
-        /* モード：顔文字（中央固定） */
+        /* 文字サイズを画面の高さ(vh)に連動させて潰れを防止！ */
         .mode-kaomoji {
-            font-size: 5rem;
+            font-size: clamp(4rem, 20vh, 10rem);
             transform: translateY(-5px);
         }
 
-        /* モード：スクロール（右から左へ） */
         .mode-scroll {
-            font-size: 3rem;
+            font-size: clamp(3rem, 25vh, 8rem);
             position: absolute;
             left: 100%;
             animation: scroll-left linear forwards;
@@ -61,19 +67,34 @@
             100% { transform: translateX(-100%); left: 0; }
         }
 
-        /* マイク録音中のアニメーション */
-        @keyframes pulse-ring {
-            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.6); }
-            70% { box-shadow: 0 0 0 20px rgba(6, 182, 212, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+        /* ★マイク録音中（枠が脈打って光る）アニメーション */
+        @keyframes pulse-board {
+            0% { border-color: #06b6d4; box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 0 0 0 rgba(6, 182, 212, 0.6); }
+            70% { border-color: #22d3ee; box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 0 0 15px rgba(6, 182, 212, 0); }
+            100% { border-color: #06b6d4; box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 0 0 0 rgba(6, 182, 212, 0); }
         }
-        .mic-active { animation: pulse-ring 1.5s infinite; border-color: #22d3ee !important; }
+        .mic-active { 
+            animation: pulse-board 1.5s infinite; 
+            border-color: #22d3ee !important; 
+        }
 
         /* モーダル */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.9); z-index: 999; flex-direction: column; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.95); z-index: 999; flex-direction: column; }
         .modal.active { display: flex; }
-        
-        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(6, 182, 212, 0.9); color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; display: none; font-weight: bold; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(6, 182, 212, 0.9); color: white; padding: 12px 24px; border-radius: 12px; z-index: 1000; display: none; font-weight: bold; white-space: nowrap; }
+
+        /* ★横画面（ランドスケープ）特化のレスポンシブデザイン */
+        @media (orientation: landscape) {
+            body { padding: 0.5rem; gap: 0.25rem; }
+            header { padding-bottom: 0 !important; }
+            header h1 { font-size: 1.25rem !important; }
+            header p { max-width: 300px !important; }
+            header button { padding: 0.5rem !important; }
+            header button i { width: 1.25rem; height: 1.25rem; }
+            /* 横画面時は下のステータス文字を隠して、電光掲示板を画面限界まで広げる */
+            .status-area { display: none !important; }
+            .led-board { border-width: 6px; border-radius: 12px; margin: 0 !important; }
+        }
     </style>
 </head>
 <body class="flex flex-col h-full p-4 gap-4 relative">
@@ -84,22 +105,32 @@
     <header class="flex justify-between items-center shrink-0">
         <div>
             <h1 class="text-xl font-black text-cyan-400 italic tracking-wider text-shadow-sm">DRIVE ASSIST <span class="text-white">AI</span></h1>
-            <p id="address-display" class="text-xs text-slate-400 font-bold truncate w-48">現在地を検索中...</p>
+            <p id="address-display" class="text-xs text-slate-400 font-bold truncate w-48 sm:w-64">現在地を検索中...</p>
         </div>
-        <div class="flex gap-3">
-            <button id="btn-logs" class="bg-slate-800 p-3 rounded-full text-cyan-400 border border-slate-700 active:bg-slate-700 shadow-lg"><i data-lucide="message-square"></i></button>
-            <button id="btn-settings" class="bg-slate-800 p-3 rounded-full text-slate-300 border border-slate-700 active:bg-slate-700 shadow-lg"><i data-lucide="settings"></i></button>
+        <div class="flex gap-2">
+            <button id="btn-logs" class="bg-slate-800 p-3 rounded-full text-cyan-400 border border-slate-700 active:bg-slate-700 shadow-lg transition-transform"><i data-lucide="message-square"></i></button>
+            <button id="btn-settings" class="bg-slate-800 p-3 rounded-full text-slate-300 border border-slate-700 active:bg-slate-700 shadow-lg transition-transform"><i data-lucide="settings"></i></button>
         </div>
     </header>
 
-    <!-- 電光掲示板エリア（メイン） -->
-    <div class="led-board flex-grow w-full my-2 relative">
+    <!-- ★電光掲示板エリア（ここをタップでマイクON！） -->
+    <div id="led-board-mic" class="led-board flex-grow w-full my-2 relative group">
         <!-- デフォルトは顔文字モード -->
         <div id="led-display" class="led-text mode-kaomoji">( ˘ω˘ )</div>
+        
+        <!-- 録音中インジケーター（右下に小さく点滅） -->
+        <div id="mic-indicator" class="absolute bottom-4 right-4 text-red-500 hidden animate-pulse bg-black/50 p-2 rounded-full z-20">
+            <i data-lucide="mic" class="w-6 h-6 sm:w-8 sm:h-8"></i>
+        </div>
+        
+        <!-- ガイド文字（待機時のみうっすら表示） -->
+        <div id="tap-guide" class="absolute bottom-2 left-0 right-0 text-center text-slate-600 font-bold text-[10px] tracking-widest z-20 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity">
+            TAP TO SPEAK
+        </div>
     </div>
 
-    <!-- ステータス表示 -->
-    <div class="flex justify-between items-end shrink-0 px-2">
+    <!-- ステータス表示（横画面時は非表示になる） -->
+    <div class="status-area flex justify-between items-end shrink-0 px-2 pb-2">
         <div class="flex flex-col gap-1">
             <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest">GPS Status</span>
             <div id="gps-status" class="text-xs font-black text-cyan-400 flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span> ONLINE</div>
@@ -110,24 +141,11 @@
         </div>
     </div>
 
-    <!-- AIアイコン 兼 マイクボタン -->
-    <div class="flex justify-center items-center shrink-0 pb-6 pt-2">
-        <div id="mic-btn" class="relative cursor-pointer transition-transform active:scale-95">
-            <div class="w-24 h-24 rounded-full border-4 border-cyan-700 overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-slate-800 flex items-center justify-center transition-all duration-300" id="avatar-ring">
-                <img src="sakura_icon.png" alt="さくら" onerror="this.src='https://via.placeholder.com/128/0f172a/06b6d4?text=Sakura'" class="w-full h-full object-cover opacity-90">
-            </div>
-            <!-- マイクアイコンバッジ -->
-            <div class="absolute -bottom-2 -right-2 bg-cyan-500 border-4 border-[#0f172a] rounded-full p-2 text-slate-900">
-                <i data-lucide="mic" class="w-5 h-5"></i>
-            </div>
-        </div>
-    </div>
-
     <!-- 過去ログ モーダル -->
-    <div id="modal-logs" class="modal p-4">
-        <header class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-black text-cyan-400">会話ログ</h2>
-            <button class="close-modal p-2 text-slate-400"><i data-lucide="x"></i></button>
+    <div id="modal-logs" class="modal p-4 sm:p-8">
+        <header class="flex justify-between items-center mb-4 shrink-0">
+            <h2 class="text-lg sm:text-xl font-black text-cyan-400">会話ログ</h2>
+            <button class="close-modal p-2 text-slate-400 active:text-white bg-slate-800 rounded-full"><i data-lucide="x"></i></button>
         </header>
         <div id="log-container" class="flex-grow overflow-y-auto bg-slate-800 rounded-xl border border-slate-700 p-4 flex flex-col gap-3">
             <p class="text-center text-slate-500 text-sm mt-10">まだログがないで！</p>
@@ -135,16 +153,16 @@
     </div>
 
     <!-- 設定 モーダル -->
-    <div id="modal-settings" class="modal p-4">
-        <header class="flex justify-between items-center mb-4">
-            <h2 class="text-lg font-black text-slate-200">設定</h2>
-            <button class="close-modal p-2 text-slate-400"><i data-lucide="x"></i></button>
+    <div id="modal-settings" class="modal p-4 sm:p-8">
+        <header class="flex justify-between items-center mb-4 shrink-0">
+            <h2 class="text-lg sm:text-xl font-black text-slate-200">設定</h2>
+            <button class="close-modal p-2 text-slate-400 active:text-white bg-slate-800 rounded-full"><i data-lucide="x"></i></button>
         </header>
         <div class="flex-grow overflow-y-auto flex flex-col gap-4">
             <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
                 <h3 class="text-xs font-bold text-cyan-400 uppercase mb-3">Gemini API キー</h3>
                 <input type="password" id="api-key-input" placeholder="AIza..." class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-3 text-sm text-white mb-3 focus:outline-none focus:border-cyan-500">
-                <button id="save-key-btn" class="w-full bg-cyan-600 text-slate-900 font-black py-3 rounded-lg active:bg-cyan-500">保存して接続テスト</button>
+                <button id="save-key-btn" class="w-full bg-cyan-600 text-slate-900 font-black py-3 rounded-lg active:bg-cyan-500 transition-colors">保存して接続テスト</button>
                 <div id="api-status-msg" class="text-xs mt-3 text-center font-bold"></div>
             </div>
 
@@ -176,8 +194,8 @@
         let useRealVoice = localStorage.getItem('useRealVoice') === 'true';
         let voiceVolume = parseFloat(localStorage.getItem('voiceVolume')) || 1.0;
         
-        let chatHistory = []; // ゆーくんとの会話の文脈を覚える配列
-        let actionLogs = [];  // 画面に表示する過去ログ用配列
+        let chatHistory = []; 
+        let actionLogs = [];  
         
         let isAIThinking = false;
         let isSpeechRecognizing = false;
@@ -191,9 +209,9 @@
         let lastAddressFetchTime = 0;
         
         // 周辺情報系変数
-        let POI_LIST = []; // Points of Interest (観光地・飲食店・オービスなど)
+        let POI_LIST = []; 
         let lastPoiFetchTime = 0;
-        let notifiedPois = new Set(); // 既に通知した場所のIDを記憶
+        let notifiedPois = new Set(); 
 
         // --- UI操作系 ---
         function showToast(msg) {
@@ -202,13 +220,23 @@
             setTimeout(() => { t.style.display = 'none'; }, 3000);
         }
 
+        // ★ステータス表示の変更（電光掲示板の枠を光らせる）
         function setAIStatus(text, isRecording = false) {
-            document.getElementById('ai-status').textContent = text;
-            const ring = document.getElementById('avatar-ring');
+            const statusText = document.getElementById('ai-status');
+            if (statusText) statusText.textContent = text;
+            
+            const board = document.getElementById('led-board-mic');
+            const indicator = document.getElementById('mic-indicator');
+            const guide = document.getElementById('tap-guide');
+            
             if (isRecording) {
-                ring.classList.add('mic-active');
+                board.classList.add('mic-active');
+                indicator.classList.remove('hidden');
+                guide.classList.add('hidden');
             } else {
-                ring.classList.remove('mic-active');
+                board.classList.remove('mic-active');
+                indicator.classList.add('hidden');
+                guide.classList.remove('hidden');
             }
         }
 
@@ -216,7 +244,6 @@
         function updateSignboard(text, kaomoji, mode) {
             const board = document.getElementById('led-display');
             
-            // アニメーションのリセット
             board.style.animation = 'none';
             board.offsetHeight; // リフローを強制
 
@@ -226,11 +253,10 @@
             } else if (mode === 'info') {
                 board.className = 'led-text mode-scroll';
                 board.textContent = text;
-                // 文字数に応じてスクロール速度を調整（1文字約0.25秒）
-                const duration = Math.max(8, text.length * 0.25);
+                // スクロール速度の調整（長文でも読めるように少し遅めに設定）
+                const duration = Math.max(8, text.length * 0.35);
                 board.style.animation = `scroll-left ${duration}s linear forwards`;
                 
-                // スクロールが終わったら顔文字に戻す
                 setTimeout(() => {
                     if (board.textContent === text) {
                         board.className = 'led-text mode-kaomoji';
@@ -245,7 +271,7 @@
             actionLogs.push({ role, text, time: new Date() });
             const container = document.getElementById('log-container');
             
-            if (actionLogs.length === 1) container.innerHTML = ''; // 初期メッセージ削除
+            if (actionLogs.length === 1) container.innerHTML = ''; 
             
             const div = document.createElement('div');
             const isUser = role === 'user';
@@ -261,7 +287,6 @@
                 </div>
             `;
             container.appendChild(div);
-            // 最新のログへスクロール
             container.scrollTop = container.scrollHeight;
         }
 
@@ -307,7 +332,6 @@
                     }
                 } catch(e) { console.warn("リアルボイス失敗、標準に切替", e); }
             }
-            // フォールバック（標準音声）
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const u = new SpeechSynthesisUtterance(text);
@@ -328,7 +352,6 @@
                 chatHistory.push({ role: "user", parts: [{ text: prompt }] });
             }
 
-            // 直近のPOIリスト（最大5件）をAIに教える
             const nearbyStr = POI_LIST.slice(0,5).map(p => `[${p.type}] ${p.name} (距離: ${Math.round(p.distance)}m)`).join(", ");
 
             const sysInstruction = `
@@ -368,19 +391,14 @@
                 if (rawText) {
                     try {
                         const parsed = JSON.parse(rawText);
-                        // AIの記憶にはテキストだけ保存する
                         chatHistory.push({ role: "model", parts: [{ text: parsed.text }] });
-                        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20); // 記憶の制限
+                        if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
 
                         addLog('model', parsed.text);
                         speak(parsed.text);
-                        
-                        // 掲示板の更新（chatなら顔文字のみ、infoならテキストスクロール）
                         updateSignboard(parsed.text, parsed.kaomoji, parsed.type);
                         
                     } catch (parseErr) {
-                        console.error("JSONパースエラー", rawText);
-                        // JSON失敗時のフォールバック
                         chatHistory.push({ role: "model", parts: [{ text: rawText }] });
                         addLog('model', rawText);
                         speak(rawText);
@@ -389,7 +407,7 @@
                 }
             } catch (err) {
                 console.error(err);
-                if (!isAutoPush) chatHistory.pop(); // エラー時はユーザーの質問を消す
+                if (!isAutoPush) chatHistory.pop(); 
                 showToast("通信エラーやわ…APIキーとか確認してな！");
             } finally {
                 isAIThinking = false;
@@ -416,7 +434,6 @@
             if (Date.now() - lastPoiFetchTime < 180000) return; // 3分に1回
             lastPoiFetchTime = Date.now();
             try {
-                // 飲食店、観光地、オービスをまとめて取得 (半径3km)
                 const q = `[out:json];(
                     node["highway"="speed_camera"](around:3000,${lat},${lng});
                     nwr["amenity"~"restaurant|cafe|fast_food"](around:3000,${lat},${lng});
@@ -458,7 +475,6 @@
                     if (lastAddress !== newAddr) {
                         lastAddress = newAddr;
                         document.getElementById('address-display').textContent = lastAddress;
-                        // 住所が変わったらプッシュ通知
                         if (apiKey) {
                             addLog('model', `現在地更新: ${lastAddress}`);
                             updateSignboard(`[現在地] ${lastAddress} を走行中やで！`, '( ˘ω˘ )', 'info');
@@ -471,11 +487,9 @@
         function checkSurroundings(lat, lng) {
             if (!POI_LIST.length || isAIThinking) return;
             
-            // 距離を計算して近い順にソート
             POI_LIST.forEach(poi => { poi.distance = getDistance(lat, lng, poi.lat, poi.lng); });
             POI_LIST.sort((a, b) => a.distance - b.distance);
 
-            // 進行方向にあるオービスチェック (1km以内)
             const nearbyOrbis = POI_LIST.find(p => p.type === "オービス" && p.distance < 1000 && !notifiedPois.has(p.id));
             if (nearbyOrbis) {
                 const bearing = getBearing(lat, lng, nearbyOrbis.lat, nearbyOrbis.lng);
@@ -487,16 +501,13 @@
                     addLog('model', msg);
                     speak(msg);
                     updateSignboard(msg, '( ﾟДﾟ)', 'info');
-                    return; // 警告優先
+                    return; 
                 }
             }
             
-            // ついでに観光地やお店の自動案内（300m以内でまだ言ってない場所）
-            // ※頻繁に喋りすぎないように、一度言ったら覚える
             const nearbySpot = POI_LIST.find(p => (p.type === "観光地" || p.type === "飲食店") && p.distance < 300 && !notifiedPois.has(p.id) && p.name !== "名称不明");
-            if (nearbySpot && Math.random() > 0.5) { // 50%の確率で紹介する（うるさすぎ防止）
+            if (nearbySpot && Math.random() > 0.5) { 
                 notifiedPois.add(nearbySpot.id);
-                // AIに一言考えさせる
                 askSakura(`今、${nearbySpot.name}(${nearbySpot.type})の近くを通ってるから、一言で紹介して！`, true);
             }
         }
@@ -522,7 +533,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
 
-            // モーダル操作
             document.getElementById('btn-logs').onclick = () => document.getElementById('modal-logs').classList.add('active');
             document.getElementById('btn-settings').onclick = () => {
                 document.getElementById('api-key-input').value = apiKey;
@@ -534,7 +544,6 @@
                 btn.onclick = (e) => e.target.closest('.modal').classList.remove('active');
             });
 
-            // 設定保存
             document.getElementById('save-key-btn').onclick = () => {
                 apiKey = document.getElementById('api-key-input').value.trim();
                 localStorage.setItem('GEMINI_API_KEY', apiKey);
@@ -550,7 +559,7 @@
                 localStorage.setItem('voiceVolume', voiceVolume);
             };
 
-            // マイク操作
+            // ★マイク操作（電光掲示板タップ）
             const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (sr) {
                 const rec = new sr(); rec.lang = 'ja-JP';
@@ -559,7 +568,8 @@
                 rec.onerror = () => { isSpeechRecognizing = false; if(!isAIThinking) setAIStatus('待機中'); };
                 rec.onresult = (e) => askSakura(e.results[0][0].transcript);
 
-                const micBtn = document.getElementById('mic-btn');
+                // タップ領域を電光掲示板に設定
+                const ledBoardBtn = document.getElementById('led-board-mic');
                 const handleMic = (e) => {
                     if (e) e.preventDefault();
                     if (!apiKey) { showToast("まずは設定からAPIキーを入れてな！"); return; }
@@ -567,11 +577,10 @@
                     unlockAudio();
                     try { rec.start(); } catch(err) {}
                 };
-                micBtn.addEventListener('click', (e) => { if (e.pointerType === "touch") return; handleMic(e); });
-                micBtn.addEventListener('touchend', handleMic);
+                ledBoardBtn.addEventListener('click', (e) => { if (e.pointerType === "touch") return; handleMic(e); });
+                ledBoardBtn.addEventListener('touchend', handleMic);
             }
 
-            // GPS開始
             if ("geolocation" in navigator) {
                 navigator.geolocation.watchPosition(updateLocation, (err) => {
                     document.getElementById('gps-status').innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500"></span> ERROR`;
