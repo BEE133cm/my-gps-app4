@@ -136,7 +136,6 @@
     </header>
 
     <div id="led-board-mic" class="led-board flex-grow w-full my-2 relative group">
-        <!-- ★顔文字とメッセージをそれぞれ独立して制御できるように変更 -->
         <div id="led-kaomoji" class="led-text text-neon-orange kaomoji-large">˘ω˘</div>
         <div id="led-message" class="led-text text-neon-orange msg-large" style="display: none;"></div>
         
@@ -206,16 +205,17 @@
     <div id="toast" class="toast"></div>
 
     <script type="module">
+        // APIキーと設定の読み込み
         let apiKey = localStorage.getItem('GEMINI_API_KEY') || "";
         let useRealVoice = localStorage.getItem('useRealVoice') === 'true';
         let voiceVolume = parseFloat(localStorage.getItem('voiceVolume')) || 1.0;
+        let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
         
         let chatHistory = []; 
         let actionLogs = [];  
-        
-        let isAIThinking = false;
         let isSpeechRecognizing = false;
         let audioUnlocked = false;
+        let isAIThinking = false;
         
         let currentPos = null;
         let currentHeading = 0;
@@ -227,9 +227,6 @@
         let lastPoiFetchTime = 0;
         let notifiedPois = new Set(); 
         
-        // ★追加：使用するAIモデルを記憶する変数（デフォルトは安定版）
-        let currentWorkingModel = localStorage.getItem('AI_WORKING_MODEL') || "gemini-1.5-flash";
-
         function showToast(msg) {
             const t = document.getElementById('toast');
             t.textContent = msg; t.style.display = 'block';
@@ -255,30 +252,25 @@
             }
         }
 
-        // ★更新：表示モード（chat/info/error）によってレイアウトをダイナミックに切り替え
         function updateSignboard(text, kaomoji, mode) {
             const kaomojiEl = document.getElementById('led-kaomoji');
             const msgEl = document.getElementById('led-message');
             const board = document.getElementById('led-board-mic');
             
-            // アニメーションを一旦リセット
             msgEl.style.animation = 'none';
             msgEl.offsetHeight;
 
-            // クラスの初期化
             kaomojiEl.className = 'led-text text-neon-orange';
             msgEl.className = 'led-text text-neon-orange';
             board.classList.remove('error-board');
 
             if (mode === 'chat') {
-                // 顔文字だけを中央にデカく表示
                 kaomojiEl.textContent = kaomoji || '˘ω˘';
                 kaomojiEl.classList.add('kaomoji-large');
                 kaomojiEl.style.display = 'block';
                 msgEl.style.display = 'none';
             } 
             else if (mode === 'info') {
-                // メッセージだけを中央にデカくスクロール
                 msgEl.textContent = text;
                 msgEl.classList.add('msg-large');
                 kaomojiEl.style.display = 'none';
@@ -287,7 +279,6 @@
                 const duration = Math.max(8, text.length * 0.35);
                 msgEl.style.animation = `scroll-left ${duration}s linear forwards`;
                 
-                // 終わったら元の顔文字に戻す
                 setTimeout(() => {
                     if (msgEl.textContent === text) {
                         kaomojiEl.textContent = kaomoji || '˘ω˘';
@@ -298,7 +289,6 @@
                 }, duration * 1000);
             }
             else if (mode === 'error') {
-                // ボード全体を赤く光らせて、上下分割レイアウトにする
                 board.classList.add('error-board');
                 
                 kaomojiEl.classList.remove('text-neon-orange');
@@ -399,11 +389,7 @@
         }
 
         async function askSakura(prompt, isAutoPush = false) {
-            // エラー専用の顔文字は輪郭なしに変更
-            if (!apiKey) { 
-                updateSignboard("APIキーが設定されてへんで！右上の歯車から登録してな！", "´；ω；`", "error"); 
-                return; 
-            }
+            if (!apiKey) { showToast("設定からAPIキーを登録してな！"); return; }
             if (isAIThinking) return;
             
             isAIThinking = true;
@@ -415,7 +401,6 @@
 
             const nearbyStr = POI_LIST.slice(0,5).map(p => `[${p.type}] ${p.name} (距離: ${Math.round(p.distance)}m)`).join(", ");
 
-            // ★AIへの指示を「輪郭不要」と明記
             const sysInstruction = `
 あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザー「ゆーくん」の車の助手席でナビサポートをしています。
 現在地: ${lastAddress}
@@ -424,13 +409,12 @@
 【指示】
 ユーザーの問いかけに答え、過去の会話の文脈も考慮してください。
 周辺のラーメン屋や観光地を聞かれたら、「周辺情報」を元に答えてください。
-感情豊かに対応してください。喜怒哀楽、ドヤ顔、照れ、ツッコミなど、会話のニュアンスに合わせて多彩な顔文字を生成してください（パターンは無限大です！）。
 出力は必ず以下のJSONスキーマに従うこと。Markdownのコードブロック等の装飾は付けないでください。
 
 {
   "type": "chat", // 挨拶や日常会話なら "chat"、周辺情報や道案内を答えるなら "info"
   "text": "ゆーくんへの返答テキスト（神戸弁でフレンドリーに）",
-  "kaomoji": "今の感情を表す顔パーツのみ（輪郭の括弧は不要）。 (例: ˘ω˘, ﾟДﾟ, ´・ω・\`, >_<, ；ﾟДﾟ )"
+  "kaomoji": "今の感情の顔文字 (例: (*´ω｀*), ( ﾟДﾟ), (T_T) )"
 }`;
 
             try {
@@ -438,20 +422,28 @@
                     contents: chatHistory,
                     systemInstruction: { parts: [{ text: sysInstruction }] },
                     tools: [{ "google_search": {} }],
-                    generationConfig: { responseMimeType: "application/json" }
+                    generationConfig: { 
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                type: { type: "STRING" },
+                                text: { type: "STRING" },
+                                kaomoji: { type: "STRING" }
+                            },
+                            required: ["type", "text", "kaomoji"]
+                        }
+                    }
                 };
 
-                // ★修正：固定のテスト版モデルではなく、利用可能な安定版モデル（currentWorkingModel）を使うように変更
                 const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${currentWorkingModel}:generateContent?key=${apiKey}`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reqBody)
                 });
                 
                 if (!resp.ok) {
-                    const errData = await resp.json();
-                    console.error("API Error details:", errData);
-                    if (resp.status === 403) throw new Error("INVALID_KEY");
-                    if (resp.status === 429) throw new Error("QUOTA_EXCEEDED");
+                    const errDetail = await resp.json();
+                    console.error("API Error Detail:", errDetail);
                     throw new Error("API_ERR");
                 }
                 
@@ -576,7 +568,6 @@
                     const msg = `⚠️注意⚠️ この先、${Math.round(nearbyOrbis.distance)}m付近にオービスがあるで！速度落としてな！`;
                     addLog('model', msg);
                     speak(msg);
-                    // オービス警告時は顔文字「ﾟДﾟ」でエラー表示形式（上下分割＋赤色）
                     updateSignboard(msg, 'ﾟДﾟ', 'error');
                     return; 
                 }
@@ -606,7 +597,6 @@
             fetchNearbyPOI(lat, lng).then(() => checkSurroundings(lat, lng));
         }
 
-        // ★追加：接続テスト関数（使えるモデルを判定する）
         async function testAIConnection(key) {
             const msgEl = document.getElementById('api-status-msg');
             msgEl.textContent = "接続テスト中...";
@@ -621,7 +611,6 @@
                 );
                 if (availableModels.length === 0) throw new Error("NO_MODELS");
                 
-                // gemini-1.5-flash を優先的に探して使う
                 let bestModel = availableModels.find(m => m.name.includes("1.5-flash")) || availableModels[0];
                 currentWorkingModel = bestModel.name.replace("models/", "");
                 localStorage.setItem('AI_WORKING_MODEL', currentWorkingModel);
@@ -644,7 +633,6 @@
                 document.getElementById('real-voice-toggle').checked = useRealVoice;
                 document.getElementById('volume-slider').value = voiceVolume * 100;
                 document.getElementById('modal-settings').classList.add('active');
-                if (apiKey) testAIConnection(apiKey); // ★開いた時に状態をチェック
             };
             document.querySelectorAll('.close-modal').forEach(btn => {
                 btn.onclick = (e) => e.target.closest('.modal').classList.remove('active');
@@ -653,8 +641,9 @@
             document.getElementById('save-key-btn').onclick = async () => {
                 apiKey = document.getElementById('api-key-input').value.trim();
                 localStorage.setItem('GEMINI_API_KEY', apiKey);
-                await testAIConnection(apiKey); // ★修正：保存時に接続テストを実行
+                await testAIConnection(apiKey);
             };
+
             document.getElementById('real-voice-toggle').onchange = (e) => {
                 useRealVoice = e.target.checked;
                 localStorage.setItem('useRealVoice', useRealVoice);
