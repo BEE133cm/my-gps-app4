@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Drive Assistant - SAKURA v2.2</title>
+    <title>AI Drive Assistant - SAKURA v2.3</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -126,7 +126,8 @@
 
     <header class="flex justify-between items-center shrink-0">
         <div>
-            <h1 class="text-xl font-black text-cyan-400 italic tracking-wider text-shadow-sm">DRIVE ASSIST <span class="text-white">AI</span></h1>
+            <!-- ★バージョン表記を追加 -->
+            <h1 class="text-xl font-black text-cyan-400 italic tracking-wider text-shadow-sm">DRIVE ASSIST <span class="text-white">AI</span> <span class="text-sm font-normal text-slate-400 not-italic ml-1">v2.3</span></h1>
             <p id="address-display" class="text-xs text-slate-400 font-bold truncate w-48 sm:w-64">現在地を検索中...</p>
         </div>
         <div class="flex gap-2">
@@ -205,7 +206,6 @@
     <div id="toast" class="toast"></div>
 
     <script type="module">
-        // APIキーと設定の読み込み
         let apiKey = localStorage.getItem('GEMINI_API_KEY') || "";
         let useRealVoice = localStorage.getItem('useRealVoice') === 'true';
         let voiceVolume = parseFloat(localStorage.getItem('voiceVolume')) || 1.0;
@@ -421,7 +421,7 @@
                 const reqBody = {
                     contents: chatHistory,
                     systemInstruction: { parts: [{ text: sysInstruction }] },
-                    tools: [{ "google_search": {} }],
+                    // ★修正ポイント：JSONスキーマと競合しがちな検索ツールを削除して安定化！
                     generationConfig: { 
                         responseMimeType: "application/json",
                         responseSchema: {
