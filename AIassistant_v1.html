@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Drive Assistant - SAKURA v2.3</title>
+    <title>AI Drive Assistant - SAKURA v2.4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -126,8 +126,8 @@
 
     <header class="flex justify-between items-center shrink-0">
         <div>
-            <!-- ★バージョン表記を追加 -->
-            <h1 class="text-xl font-black text-cyan-400 italic tracking-wider text-shadow-sm">DRIVE ASSIST <span class="text-white">AI</span> <span class="text-sm font-normal text-slate-400 not-italic ml-1">v2.3</span></h1>
+            <!-- ★バージョン表記をv2.4に更新 -->
+            <h1 class="text-xl font-black text-cyan-400 italic tracking-wider text-shadow-sm">DRIVE ASSIST <span class="text-white">AI</span> <span class="text-sm font-normal text-slate-400 not-italic ml-1">v2.4</span></h1>
             <p id="address-display" class="text-xs text-slate-400 font-bold truncate w-48 sm:w-64">現在地を検索中...</p>
         </div>
         <div class="flex gap-2">
@@ -401,38 +401,32 @@
 
             const nearbyStr = POI_LIST.slice(0,5).map(p => `[${p.type}] ${p.name} (距離: ${Math.round(p.distance)}m)`).join(", ");
 
+            // ★修正ポイント：天気や質問には検索を使うように命令を追加
             const sysInstruction = `
 あなたは神戸弁の明るい女子学生AI「さくら」です。ユーザー「ゆーくん」の車の助手席でナビサポートをしています。
 現在地: ${lastAddress}
 周辺情報: ${nearbyStr || "特になし"}
 
 【指示】
-ユーザーの問いかけに答え、過去の会話の文脈も考慮してください。
-周辺のラーメン屋や観光地を聞かれたら、「周辺情報」を元に答えてください。
-出力は必ず以下のJSONスキーマに従うこと。Markdownのコードブロック等の装飾は付けないでください。
+・ユーザーの問いかけに答え、過去の会話の文脈も考慮してください。
+・今の天気、ニュース、一般的な質問には、Google検索を使って最新の情報を調べて答えてください。
+・周辺のラーメン屋や観光地を聞かれたら、「周辺情報」を元に答えてください。
+・出力は必ず以下のJSON形式にすること。Markdownのコードブロック（\`\`\`json）等の装飾は絶対に付けないでください。
 
 {
-  "type": "chat", // 挨拶や日常会話なら "chat"、周辺情報や道案内を答えるなら "info"
+  "type": "chat", // 挨拶や日常会話なら "chat"、天気・ニュース・周辺情報・道案内などの情報提供なら "info"
   "text": "ゆーくんへの返答テキスト（神戸弁でフレンドリーに）",
   "kaomoji": "今の感情の顔文字 (例: (*´ω｀*), ( ﾟДﾟ), (T_T) )"
 }`;
 
             try {
+                // ★修正ポイント：Google検索ツールを復活させ、エラーになりやすいSchema指定を外す（MIME指定のみでJSON化）
                 const reqBody = {
                     contents: chatHistory,
                     systemInstruction: { parts: [{ text: sysInstruction }] },
-                    // ★修正ポイント：JSONスキーマと競合しがちな検索ツールを削除して安定化！
+                    tools: [{ "google_search": {} }], 
                     generationConfig: { 
-                        responseMimeType: "application/json",
-                        responseSchema: {
-                            type: "OBJECT",
-                            properties: {
-                                type: { type: "STRING" },
-                                text: { type: "STRING" },
-                                kaomoji: { type: "STRING" }
-                            },
-                            required: ["type", "text", "kaomoji"]
-                        }
+                        responseMimeType: "application/json"
                     }
                 };
 
